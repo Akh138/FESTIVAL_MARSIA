@@ -1,52 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { apiFetch, setToken } from "../services/api.js";
 
 function LoginPage({ setUser, setPage }) {
     const [form, setForm] = useState({
-        email: '',
-        mot_de_passe: ''
+        email: "",
+        mot_de_passe: "",
     });
-    const [error, setError] = useState('');
+    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    const handleChange = (e) => {
+        setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
+        setError("");
         setLoading(true);
 
         try {
-            const res = await fetch('http://localhost:8081/api/v1/utilisateurs?email=' + form.email);
-            const users = await res.json();
+            // ✅ On utilise le VRAI endpoint backend
+            const data = await apiFetch("/api/v1/auth/login", {
+                method: "POST",
+                body: JSON.stringify({
+                    email: form.email,
+                    mot_de_passe: form.mot_de_passe,
+                }),
+            });
 
-            const user = users.find(u => u.email === form.email);
-            if (user && form.mot_de_passe === user.mot_de_passe) {
-                setUser(user);
+            // data attendu: { message, token, user }
+            setToken(data.token);
 
-                // 🔑 REDIRECTION SELON RÔLE
-                switch (user.nom_role) {
-                    case 'ADMIN':
-                        setPage('admin-users'); // Dashboard Admin
-                        break;
-                    case 'REALISATEUR':
-                        setPage('soumission-film'); // Soumission film
-                        break;
-                    case 'JURY':
-                        setPage('jury-dashboard'); // Tableau de bord Jury
-                        break;
-                    default: // PUBLIC
-                        setPage('home');
-                }
-            } else {
-                setError('Email ou mot de passe incorrect');
+            // 🔁 Ton App.jsx attend user.nom_role, mais le backend renvoie le rôle dans le JWT.
+            // On garde "nom_role" côté front pour rester compatible avec ton App actuel.
+            const role = data?.user?.nom_role || data?.user?.role || "PUBLIC";
+
+            const user = {
+                ...data.user,
+                nom_role: role,
+            };
+
+            setUser(user);
+
+            // 🔑 REDIRECTION SELON RÔLE
+            switch (user.nom_role) {
+                case "ADMIN":
+                    setPage("admin-users");
+                    break;
+                case "REALISATEUR":
+                    setPage("soumission-film");
+                    break;
+                case "JURY":
+                    setPage("jury-dashboard");
+                    break;
+                default:
+                    setPage("home");
             }
         } catch (err) {
-            setError('Erreur connexion');
+            setError(err.message || "Email ou mot de passe incorrect");
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleChange = (e) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
     };
 
     return (
@@ -83,12 +97,17 @@ function LoginPage({ setUser, setPage }) {
                     </div>
 
                     <button type="submit" className="btn-primary btn-large" disabled={loading}>
-                        {loading ? 'Connexion...' : 'Se connecter'}
+                        {loading ? "Connexion..." : "Se connecter"}
                     </button>
                 </form>
 
                 <div className="auth-footer">
-                    <p>Pas de compte ? <button onClick={() => setPage('register')} className="link-btn">S'inscrire</button></p>
+                    <p>
+                        Pas de compte ?{" "}
+                        <button onClick={() => setPage("register")} className="link-btn">
+                            S'inscrire
+                        </button>
+                    </p>
                 </div>
             </div>
         </div>

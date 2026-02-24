@@ -1,0 +1,135 @@
+/* src/styles/background.css
+   Fond global : image + glow léger + anim subtile
+   ✅ S'applique directement au body
+   ✅ Aucun wrapper .marsia-bg nécessaire
+*/
+
+/* =========================
+   BASE
+   ========================= */
+
+html, body {
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    overflow-x: hidden;
+    background: #050814; /* fallback */
+    position: relative;
+}
+
+/* =========================
+   COUCHE 1 : image de fond
+   ========================= */
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+
+    /* ⚠️ Chemin corrigé (important pour Vite/React) */
+    background:
+            linear-gradient(180deg, rgba(5,8,20,0.88), rgba(5,8,20,0.82)),
+            url("../assets/circuit-bg.jpeg");
+
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    /* Animation légère */
+    transform: translate3d(0,0,0) scale(1.03);
+    animation: none;
+    filter: saturate(1.08) contrast(1.06);
+    opacity: 1;
+}
+
+@keyframes bgDrift {
+    from { transform: translate3d(-8px,-6px,0) scale(1.03); }
+    to   { transform: translate3d(10px,8px,0) scale(1.05); }
+}
+
+/* =========================
+   COUCHE 2 : glow / éclairs
+   ========================= */
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+
+    background:
+            radial-gradient(800px 500px at 25% 35%, rgba(56,189,248,0.12), transparent 62%),
+            radial-gradient(900px 600px at 70% 55%, rgba(139,92,246,0.10), transparent 65%),
+            radial-gradient(700px 450px at 55% 80%, rgba(34,211,238,0.10), transparent 62%),
+
+            linear-gradient(
+                    110deg,
+                    transparent 0%,
+                    rgba(120,190,255,0) 47%,
+                    rgba(120,190,255,0.18) 50%,
+                    rgba(120,190,255,0) 53%,
+                    transparent 100%
+            ),
+            linear-gradient(
+                    25deg,
+                    transparent 0%,
+                    rgba(200,120,255,0) 47%,
+                    rgba(200,120,255,0.14) 50%,
+                    rgba(200,120,255,0) 53%,
+                    transparent 100%
+            ),
+            linear-gradient(
+                    160deg,
+                    transparent 0%,
+                    rgba(56,189,248,0) 47%,
+                    rgba(56,189,248,0.14) 50%,
+                    rgba(56,189,248,0) 53%,
+                    transparent 100%
+            );
+
+    background-size:
+            120% 120%,
+            120% 120%,
+            120% 120%,
+            160% 160%,
+            170% 170%,
+            180% 180%;
+
+    background-position:
+            0% 0%,
+            50% 20%,
+            40% 90%,
+            10% 15%,
+            70% 40%,
+            35% 78%;
+
+    opacity: 0.9;
+    mix-blend-mode: screen;
+    filter: blur(0.25px) drop-shadow(0 0 10px rgba(56,189,248,0.10));
+
+    animation: none;
+}
+
+@keyframes glowPulse {
+    0%   { opacity: 0.65; transform: translate3d(0,0,0); }
+    40%  { opacity: 0.95; transform: translate3d(1px,-1px,0); }
+    70%  { opacity: 0.75; transform: translate3d(-1px,1px,0); }
+    100% { opacity: 0.65; transform: translate3d(0,0,0); }
+}
+
+/* =========================
+   Accessibilité
+   ========================= */
+
+@media (prefers-reduced-motion: reduce) {
+    body::before,
+    body::after {
+        animation: none !important;
+    }
+}

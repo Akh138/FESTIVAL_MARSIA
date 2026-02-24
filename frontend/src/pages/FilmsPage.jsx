@@ -1,305 +1,183 @@
-import React, { useEffect, useState, useRef } from 'react';
-
-const API_URL = 'http://localhost:8081/api/v1';
+// src/pages/FilmsPage.jsx
+import React, { useEffect, useState } from "react";
+import { apiFetch } from "../services/api.js";
 
 function FilmsPage({ setPage }) {
     const [films, setFilms] = useState([]);
-    const [form, setForm] = useState({
-        id_realisateur: '',
-        titre: '',
-        description: '',
-        lien_youtube: '',
-        duree_secondes: '',
-        pays: '',
-        fichier_video: null
-    });
-    const [showForm, setShowForm] = useState(false); // 🆕 Modal fermé
-    const [editingId, setEditingId] = useState(null);
-    const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const fileInputRef = useRef(null);
+    const [actionLoadingId, setActionLoadingId] = useState(null);
+    const [error, setError] = useState("");
 
-    const fetchFilms = async () => {
+    const fetchEnAttente = async () => {
+        setError("");
+        setLoading(true);
         try {
-            setLoading(true);
-            const res = await fetch(`${API_URL}/films`);
-            const data = await res.json();
-            setFilms(data);
+            const data = await apiFetch("/api/v1/films/en-attente");
+            setFilms(Array.isArray(data) ? data : []);
         } catch (e) {
-            setError('Impossible de charger les films');
+            setError(e.message || "Erreur serveur");
+            setFilms([]);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchFilms();
+        fetchEnAttente();
     }, []);
 
-    const handleChange = (e) => {
-        if (e.target.name === 'fichier_video') {
-            const file = e.target.files[0];
-            if (file && file.size > 500 * 1024 * 1024) {
-                setError('Fichier trop volumineux (max 500MB)');
-                return;
-            }
-            setForm((f) => ({ ...f, fichier_video: file }));
-        } else {
-            setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
-        }
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-
-        const formData = new FormData();
-        formData.append('id_realisateur', Number(form.id_realisateur) || null);
-        formData.append('titre', form.titre);
-        formData.append('description', form.description);
-        formData.append('lien_youtube', form.lien_youtube);
-        formData.append('duree_secondes', Number(form.duree_secondes) || null);
-        formData.append('pays', form.pays);
-        if (form.fichier_video) {
-            formData.append('fichier_video', form.fichier_video);
-        }
+    const moderer = async (idFilm, statut) => {
+        setError("");
+        setActionLoadingId(idFilm);
 
         try {
-            setLoading(true);
-            // ❌ UNIQUEMENT UPDATE (pas de création)
-            formData.append('id_film', editingId);
-            const res = await fetch(`${API_URL}/films/${editingId}`, {
-                method: 'PUT',
-                body: formData,
+            await apiFetch(`/api/v1/films/${idFilm}/moderation`, {
+                method: "PATCH",
+                body: JSON.stringify({ statut_moderation: statut }),
             });
-            if (!res.ok) throw new Error('Erreur mise à jour');
 
-            setForm({
-                id_realisateur: '',
-                titre: '',
-                description: '',
-                lien_youtube: '',
-                duree_secondes: '',
-                pays: '',
-                fichier_video: null
-            });
-            setEditingId(null);
-            setShowForm(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-            fetchFilms();
-        } catch (err) {
-            setError("Erreur lors de la modification du film");
+            // ✅ On retire le film de la liste (car plus "en attente")
+            setFilms((prev) => prev.filter((f) => f.id_film !== idFilm));
+        } catch (e) {
+            setError(e.message || "Erreur serveur");
         } finally {
-            setLoading(false);
-            setUploadProgress(0);
+            setActionLoadingId(null);
         }
-    };
-
-    const handleEdit = (film) => {
-        setEditingId(film.id_film);
-        setForm({
-            id_realisateur: film.id_realisateur || '',
-            titre: film.titre || '',
-            description: film.description || '',
-            lien_youtube: film.lien_youtube || '',
-            duree_secondes: film.duree_secondes || '',
-            pays: film.pays || '',
-            fichier_video: null
-        });
-        setShowForm(true); // 🆕 Ouvre modal
-    };
-
-    const handleDelete = async (id) => {
-        if (!window.confirm('Supprimer ce film ?')) return;
-        try {
-            const res = await fetch(`${API_URL}/films/${id}`, { method: 'DELETE' });
-            if (!res.ok) throw new Error();
-            fetchFilms();
-        } catch {
-            setError('Erreur lors de la suppression');
-        }
-    };
-
-    const formatDuration = (seconds) => {
-        if (!seconds) return 'N/A';
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
     return (
-        <div className="admin-layout">
-
-            {/* 📊 CONTENU */}
-            <div className="admin-content">
-                <div className="page-header">
-                    <div>
-                        <h1>🎬 Gestion Films</h1>
-                        <p>{films.length} films ({films.filter(f => f.statut_moderation === 'EN_ATTENTE').length} en attente)</p>
-                    </div>
-                    <div className="page-actions">
-                        {/* ❌ PAS DE ➕ CRÉATION */}
-                        <button className="btn-home" onClick={() => setPage('home')}>
-                            ← Accueil
-                        </button>
-                    </div>
+        <div style={{ padding: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                    <h1 style={{ margin: 0 }}>🎬 Modération des films</h1>
+                    <p style={{ marginTop: 6, opacity: 0.8 }}>
+                        Films en attente : <strong>{films.length}</strong>
+                    </p>
                 </div>
 
-                {error && <div className="error-banner">{error}</div>}
-
-                <div className="table-section">
-                    <h3>Liste des films ({films.length})</h3>
-                    {loading ? (
-                        <div className="loading">Chargement...</div>
-                    ) : films.length === 0 ? (
-                        <div className="empty-state">
-                            <p>Aucun film</p>
-                            <p>Les réalisateurs soumettent via la page Soumission</p>
-                        </div>
-                    ) : (
-                        <div className="table-container">
-                            <table className="admin-table">
-                                <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Titre</th>
-                                    <th>Réalisateur</th>
-                                    <th>Pays</th>
-                                    <th>Durée</th>
-                                    <th>Statut</th>
-                                    <th>Actions</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {films.map((f) => (
-                                    <tr key={f.id_film}>
-                                        <td>#{f.id_film}</td>
-                                        <td><strong>{f.titre}</strong></td>
-                                        <td>#{f.id_realisateur}</td>
-                                        <td>{f.pays || 'N/A'}</td>
-                                        <td>{formatDuration(f.duree_secondes)}</td>
-                                        <td>
-                                                <span className={`status-badge status-${f.statut_moderation?.toLowerCase()}`}>
-                                                    {f.statut_moderation || 'EN_ATTENTE'}
-                                                </span>
-                                        </td>
-                                        <td>
-                                            <button className="btn-edit" onClick={() => handleEdit(f)} title="Modifier">
-                                                ✏️
-                                            </button>
-                                            <button className="btn-delete" onClick={() => handleDelete(f.id_film)} title="Supprimer">
-                                                🗑️
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => setPage?.("home")} style={btnSecondary}>
+                        ← Accueil
+                    </button>
+                    <button onClick={fetchEnAttente} disabled={loading} style={btnPrimary}>
+                        {loading ? "⏳ Rafraîchir..." : "🔄 Rafraîchir"}
+                    </button>
                 </div>
+            </div>
 
-                {/* 🆕 MODAL MODIFIER UNIQUEMENT */}
-                {showForm && (
-                    <div className="modal-overlay" onClick={() => setShowForm(false)}>
-                        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                            <div className="modal-header">
-                                <h3>✏️ Modifier film #{editingId}</h3>
-                                <button className="modal-close" onClick={() => setShowForm(false)}>
-                                    ×
-                                </button>
+            {error && (
+                <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "#ffe9e9", color: "#8a1f1f" }}>
+                    ❌ {error}
+                </div>
+            )}
+
+            <div style={{ marginTop: 16 }}>
+                {loading ? (
+                    <div style={{ padding: 12 }}>Chargement...</div>
+                ) : films.length === 0 ? (
+                    <div style={{ padding: 12, border: "1px dashed #bbb", borderRadius: 10 }}>✅ Aucun film en attente.</div>
+                ) : (
+                    <div style={{ display: "grid", gap: 12 }}>
+                        {films.map((f) => (
+                            <div key={f.id_film} style={card}>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                                    <div>
+                                        <div style={{ fontSize: 18, fontWeight: 700 }}>
+                                            #{f.id_film} — {f.titre}
+                                        </div>
+                                        <div style={{ marginTop: 6, opacity: 0.85 }}>
+                                            👤 {f.realisateur_prenom} {f.realisateur_nom}{" "}
+                                            {f.realisateur_email ? <span style={{ opacity: 0.7 }}>({f.realisateur_email})</span> : null}
+                                        </div>
+                                        <div style={{ marginTop: 6, opacity: 0.85 }}>
+                                            🌍 {f.pays || "N/A"} • ⏱️ {f.duree_secondes ?? "N/A"} sec
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: "flex", gap: 8, alignItems: "start" }}>
+                                        <button
+                                            style={btnApprove}
+                                            disabled={actionLoadingId === f.id_film}
+                                            onClick={() => moderer(f.id_film, "approuve")}
+                                        >
+                                            {actionLoadingId === f.id_film ? "⏳" : "✅ Approuver"}
+                                        </button>
+                                        <button
+                                            style={btnReject}
+                                            disabled={actionLoadingId === f.id_film}
+                                            onClick={() => moderer(f.id_film, "rejete")}
+                                        >
+                                            {actionLoadingId === f.id_film ? "⏳" : "❌ Rejeter"}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {f.description ? (
+                                    <div style={{ marginTop: 10, opacity: 0.9 }}>
+                                        <strong>Description :</strong> {f.description}
+                                    </div>
+                                ) : null}
+
+                                {f.lien_youtube ? (
+                                    <div style={{ marginTop: 10 }}>
+                                        <a href={f.lien_youtube} target="_blank" rel="noreferrer">
+                                            🔗 Voir lien YouTube
+                                        </a>
+                                    </div>
+                                ) : null}
+
+                                <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+                                    Statut actuel : <strong>{f.statut_moderation}</strong>
+                                </div>
                             </div>
-                            <form onSubmit={handleSubmit}>
-                                {error && <div className="error">{error}</div>}
-
-                                <div className="form-row">
-                                    <label>ID Réalisateur *</label>
-                                    <input
-                                        name="id_realisateur"
-                                        type="number"
-                                        value={form.id_realisateur}
-                                        onChange={handleChange}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="form-row">
-                                    <label>Titre *</label>
-                                    <input
-                                        name="titre"
-                                        value={form.titre}
-                                        onChange={handleChange}
-                                        required
-                                    />
-                                </div>
-
-                                <div className="form-row">
-                                    <label>Description</label>
-                                    <textarea
-                                        name="description"
-                                        value={form.description}
-                                        onChange={handleChange}
-                                        rows="3"
-                                    />
-                                </div>
-
-                                <div className="form-row">
-                                    <label>Nouveau fichier vidéo (optionnel)</label>
-                                    <input
-                                        ref={fileInputRef}
-                                        name="fichier_video"
-                                        type="file"
-                                        accept="video/*,.mp4,.avi,.mov,.mkv"
-                                        onChange={handleChange}
-                                    />
-                                    {form.fichier_video && (
-                                        <p className="file-info">
-                                            📁 {form.fichier_video.name} ({(form.fichier_video.size / 1024 / 1024).toFixed(1)} MB)
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="form-row">
-                                    <label>Lien YouTube</label>
-                                    <input
-                                        name="lien_youtube"
-                                        value={form.lien_youtube}
-                                        onChange={handleChange}
-                                        placeholder="https://youtube.com/watch?v=..."
-                                    />
-                                </div>
-
-                                <div className="form-row">
-                                    <label>Durée (secondes)</label>
-                                    <input
-                                        name="duree_secondes"
-                                        type="number"
-                                        value={form.duree_secondes}
-                                        onChange={handleChange}
-                                    />
-                                </div>
-
-                                <div className="form-row">
-                                    <label>Pays</label>
-                                    <input name="pays" value={form.pays} onChange={handleChange} />
-                                </div>
-
-                                <div className="form-actions">
-                                    <button type="submit" disabled={loading} className="btn-primary">
-                                        {loading ? '📤 Mise à jour...' : 'Mettre à jour film'}
-                                    </button>
-                                    <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>
-                                        Annuler
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                        ))}
                     </div>
                 )}
             </div>
         </div>
     );
 }
+
+const card = {
+    padding: 14,
+    borderRadius: 12,
+    border: "1px solid #e3e3e3",
+    background: "white",
+};
+
+const btnPrimary = {
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #111",
+    background: "#111",
+    color: "white",
+    cursor: "pointer",
+};
+
+const btnSecondary = {
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #bbb",
+    background: "white",
+    cursor: "pointer",
+};
+
+const btnApprove = {
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #1f7a1f",
+    background: "#1f7a1f",
+    color: "white",
+    cursor: "pointer",
+};
+
+const btnReject = {
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid #b52a2a",
+    background: "#b52a2a",
+    color: "white",
+    cursor: "pointer",
+};
 
 export default FilmsPage;
