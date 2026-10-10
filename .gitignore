@@ -1,0 +1,23 @@
+# Tous les dossiers node_modules (racine, backend, frontend)
+node_modules/
+*/node_modules/
+
+# Secrets et variables d'environnement
+.env
+*/.env
+*.env
+
+# Caches et logs
+npm-debug.log*
+yarn-debug.log*
+dist/
+build/
+.vite/
+
+# Fichiers internes d'IDE
+.idea/
+*.iml
+
+# Vidéos volumineuses téléversées
+backend/uploads/films/*.mp4
+uploads/

@@ -1,7 +1,13 @@
 import db from "../config/db.js";
 import bcrypt from "bcrypt";
 
+// rôles autorisés depuis le formulaire public
+const ALLOWED_REGISTER_ROLES = ["JURY", "MANAGER"];
+
+
+// =============================
 // GET tous les utilisateurs
+// =============================
 export const getAllUsers = async (req, res) => {
     try {
         const [results] = await db.execute(
@@ -13,7 +19,10 @@ export const getAllUsers = async (req, res) => {
     }
 };
 
+
+// =============================
 // GET utilisateur par ID
+// =============================
 export const getUserById = async (req, res) => {
     try {
         const { id } = req.params;
@@ -33,19 +42,31 @@ export const getUserById = async (req, res) => {
     }
 };
 
-// REGISTER
+
+// =============================
+// INSCRIPTION PUBLIQUE
+// Ici on autorise seulement Jury et Manager
+// Le compte est créé en attente de validation admin
+// =============================
 export const register = async (req, res) => {
     try {
-        const { nom, prenom, email, mot_de_passe } = req.body;
+        const { nom, prenom, email, mot_de_passe, nom_role } = req.body;
 
-        // 1️⃣ Vérification des champs
-        if (!nom || !prenom || !email || !mot_de_passe) {
+        // on vérifie que tout est rempli
+        if (!nom || !prenom || !email || !mot_de_passe || !nom_role) {
             return res.status(400).json({
                 message: "Tous les champs sont obligatoires"
             });
         }
 
-        // 2️⃣ Vérifier si l’email existe déjà
+        // on limite les rôles disponibles depuis le front
+        if (!ALLOWED_REGISTER_ROLES.includes(nom_role)) {
+            return res.status(400).json({
+                message: "Rôle non autorisé pour l'inscription"
+            });
+        }
+
+        // on vérifie que l'email n'existe pas déjà
         const [existingUser] = await db.execute(
             "SELECT id_utilisateur FROM utilisateur WHERE email = ?",
             [email]
@@ -57,24 +78,24 @@ export const register = async (req, res) => {
             });
         }
 
-        // 3️⃣ Hash du mot de passe
+        // hash du mot de passe
         const hashedPassword = await bcrypt.hash(mot_de_passe, 10);
 
-        // 4️⃣ Insertion en base
+        // insertion en base
+        // actif = 0 => compte en attente de validation admin
         await db.execute(
-            `INSERT INTO utilisateur (nom, prenom, email, mot_de_passe, date_inscription)
-             VALUES (?, ?, ?, ?, NOW())`,
-            [nom, prenom, email, hashedPassword]
+            `INSERT INTO utilisateur (nom, prenom, email, mot_de_passe, nom_role, actif, date_inscription)
+             VALUES (?, ?, ?, ?, ?, 0, NOW())`,
+            [nom, prenom, email, hashedPassword, nom_role]
         );
 
-        // 5️⃣ Réponse OK
         res.status(201).json({
             success: true,
-            message: "Utilisateur créé avec succès"
+            message: "Inscription envoyée. Votre compte doit être validé par un administrateur."
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Erreur register utilisateur :", error);
         res.status(500).json({
             message: "Erreur serveur"
         });

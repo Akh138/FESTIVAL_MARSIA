@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import "./AppHeader.css";
 
 export default function AppHeader({
                                       isBackoffice,
@@ -8,45 +9,37 @@ export default function AppHeader({
                                       user,
                                       onLogout,
                                   }) {
-    const [isPublicMenuOpen, setIsPublicMenuOpen] = React.useState(false);
-    const menuRef = useRef(null);
+    const [isMobileOpen, setIsMobileOpen] = useState(false);
+    const wrapRef = useRef(null);
 
+    const isAdmin = user?.nom_role === "ADMIN";
+    const isManager = user?.nom_role === "MANAGER";
+    const isJury = user?.nom_role === "JURY";
+
+    // ferme le menu mobile quand on change de page ou de mode
     useEffect(() => {
-        setIsPublicMenuOpen(false);
+        setIsMobileOpen(false);
     }, [page, isBackoffice]);
 
+    // ferme le menu si clic en dehors
     useEffect(() => {
         const onDown = (e) => {
-            if (!isPublicMenuOpen) return;
-            if (!menuRef.current) return;
-            if (!menuRef.current.contains(e.target)) setIsPublicMenuOpen(false);
+            if (!isMobileOpen) return;
+            if (!wrapRef.current) return;
+            if (!wrapRef.current.contains(e.target)) setIsMobileOpen(false);
         };
+
         window.addEventListener("mousedown", onDown);
         return () => window.removeEventListener("mousedown", onDown);
-    }, [isPublicMenuOpen]);
-
-    // ✅ anti-bug ultime : même si un CSS externe tente de bouger le header
-    const headerStyle = {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        width: "100%",
-        zIndex: 99999,
-        transform: "none",
-    };
+    }, [isMobileOpen]);
 
     return (
-        <header
-            style={headerStyle}
-            className={isBackoffice ? "app-header header-backoffice" : "app-header header-public"}
-        >
+        <header className={isBackoffice ? "app-header header-backoffice" : "app-header header-public"}>
             <nav className="main-nav">
-                {/* (TON CONTENU INCHANGÉ CI-DESSOUS) */}
                 {isBackoffice ? (
                     <>
                         <div className="nav-left">
-                            <h1>🔧Dashboard Admin</h1>
+                            <h1>🔧</h1>
                             <button className="btn-back" onClick={() => setIsBackoffice(false)}>
                                 ← Site Public
                             </button>
@@ -56,27 +49,50 @@ export default function AppHeader({
                             <div className="nav-group">
                                 <h4>🔐 Gestion Admin</h4>
 
-                                <button className={page === "admin-users" ? "active" : ""} onClick={() => setPage("admin-users")}>
-                                    👥 Utilisateurs
+                                {/* utilisateurs = admin seulement */}
+                                {isAdmin && (
+                                    <button
+                                        className={page === "admin-users" ? "active" : ""}
+                                        onClick={() => setPage("admin-users")}
+                                    >
+                                        👥 Utilisateurs
+                                    </button>
+                                )}
+
+                                {/* manager + admin */}
+                                <button
+                                    className={page === "films-moderation" ? "active" : ""}
+                                    onClick={() => setPage("films-moderation")}
+                                >
+                                    🎬 Films (Modération)
                                 </button>
 
-                                <button className={page === "films" ? "active" : ""} onClick={() => setPage("films")}>
-                                    🎬 Films
+                                <button
+                                    className={page === "galerie" ? "active" : ""}
+                                    onClick={() => setPage("galerie")}
+                                >
+                                    🖼️ Galerie (Public)
                                 </button>
 
-                                <button className={page === "votes" ? "active" : ""} onClick={() => setPage("votes")}>
-                                    🗳️ Votes
+
+                                <button
+                                    className={page === "admin-newsletter" ? "active" : ""}
+                                    onClick={() => setPage("admin-newsletter")}
+                                >
+                                    📧 Newsletter (Admin)
                                 </button>
 
-                                <button className={page === "newsletter" ? "active" : ""} onClick={() => setPage("newsletter")}>
-                                    📧 Newsletter
-                                </button>
-
-                                <button className={page === "admin-stats" ? "active" : ""} onClick={() => setPage("admin-stats")}>
+                                <button
+                                    className={page === "admin-stats" ? "active" : ""}
+                                    onClick={() => setPage("admin-stats")}
+                                >
                                     📊 Stats
                                 </button>
 
-                                <button className={page === "notifications" ? "active" : ""} onClick={() => setPage("notifications")}>
+                                <button
+                                    className={page === "notifications" ? "active" : ""}
+                                    onClick={() => setPage("notifications")}
+                                >
                                     🔔 Notifications
                                 </button>
                             </div>
@@ -89,119 +105,119 @@ export default function AppHeader({
                         </div>
                     </>
                 ) : (
-                    <>
-                        {/* GAUCHE */}
-                        <div className="hp-left" ref={menuRef}>
-                            <div className="hp-brand" onClick={() => setPage("home")} role="button" tabIndex={0}>
-                                <div className="hp-logoMark" aria-hidden="true">🌐</div>
-                                <div className="hp-brandText">
-                                    <div className="hp-brandTitle">MARSIA FESTIVAL</div>
-                                    <div className="hp-brandSub">IA Short Movies</div>
-                                </div>
-                            </div>
-
-                            <button
-                                className="hp-burger"
-                                type="button"
-                                aria-label="Ouvrir le menu"
-                                aria-expanded={isPublicMenuOpen}
-                                onClick={() => setIsPublicMenuOpen((v) => !v)}
-                            >
-                                ☰
+                    <div className="mh-wrap" ref={wrapRef}>
+                        <div className="mh-row">
+                            <button className="mh-brand" type="button" onClick={() => setPage("home")}>
+                                <span className="mh-logo" aria-hidden="true">🌐</span>
+                                <span className="mh-brandText">
+                                    <span className="mh-title">MARSIA FESTIVAL</span>
+                                    <span className="mh-sub">IA Short Movies</span>
+                                </span>
                             </button>
 
-                            {isPublicMenuOpen && (
-                                <div className="hp-menuPanel" role="dialog" aria-label="Menu">
-                                    <div className="hp-menuGroup">
-                                        <button onClick={() => setPage("home")}>Accueil</button>
-                                        <button onClick={() => setPage("films")}>Films</button>
-                                        <button onClick={() => setPage("soumission-film")}>Participer</button>
-                                    </div>
-
-                                    <div className="hp-menuDivider" />
-
-                                    {user ? (
-                                        <div className="hp-menuGroup">
-                                            <div className="hp-hello">👋 {user.prenom}</div>
-
-                                            {user.nom_role === "ADMIN" && (
-                                                <button className="hp-menuAction" onClick={() => setIsBackoffice(true)}>
-                                                    🔧 Backoffice
-                                                </button>
-                                            )}
-
-                                            <button className="hp-menuDanger" onClick={onLogout}>
-                                                🚪 Déconnexion
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="hp-menuGroup">
-                                            <button onClick={() => setPage("login")}>Connexion</button>
-                                            <button className="hp-menuAction" onClick={() => setPage("register")}>
-                                                S'inscrire
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* CENTRE */}
-                        <div className="hp-center">
-                            <div className="hp-pills">
-                                <button className={`hp-pill ${page === "home" ? "active" : ""}`} onClick={() => setPage("home")}>
+                            <div className="mh-links">
+                                <button
+                                    type="button"
+                                    className={`mh-link ${page === "home" ? "is-active" : ""}`}
+                                    onClick={() => setPage("home")}
+                                >
                                     Accueil
                                 </button>
-                                <button className={`hp-pill ${page === "films" ? "active" : ""}`} onClick={() => setPage("films")}>
+
+                                <button
+                                    type="button"
+                                    className={`mh-link ${page === "galerie" ? "is-active" : ""}`}
+                                    onClick={() => setPage("galerie")}
+                                >
                                     Films
                                 </button>
-                                <button className={`hp-pill ${page === "soumission-film" ? "active" : ""}`} onClick={() => setPage("soumission-film")}>
+
+                                <button
+                                    type="button"
+                                    className={`mh-link ${page === "soumission-film" ? "is-active" : ""}`}
+                                    onClick={() => setPage("soumission-film")}
+                                >
                                     Participer
                                 </button>
                             </div>
-                        </div>
 
-                        {/* DROITE */}
-                        <div className="hp-right">
-                            <div className="hp-icons">
-                                <button className="hp-iconBtn" type="button" aria-label="YouTube">
-                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                                        <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.6 3.5 12 3.5 12 3.5s-7.6 0-9.4.6A3 3 0 0 0 .5 6.2 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.8.6 9.4.6 9.4.6s7.6 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.8zM9.8 15.5V8.5l6 3.5-6 3.5z" />
-                                    </svg>
-                                </button>
+                            <div className="mh-actions">
+                                {user ? (
+                                    <>
+                                        <span className="mh-hello">👋 {user.prenom}</span>
 
-                                <button className="hp-iconBtn" type="button" aria-label="Rechercher">
-                                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" strokeWidth="2">
-                                        <circle cx="11" cy="11" r="7" />
-                                        <line x1="16.65" y1="16.65" x2="21" y2="21" />
-                                    </svg>
-                                </button>
+                                        {/* bouton jury */}
+                                        {isJury && (
+                                            <button
+                                                className="mh-btn mh-btn-ghost"
+                                                type="button"
+                                                onClick={() => setPage("jury-dashboard")}
+                                            >
+                                                ⚖️ Dashboard Jury
+                                            </button>
+                                        )}
+
+                                        {/* backoffice = admin + manager */}
+                                        {(isAdmin || isManager) && (
+                                            <button
+                                                className="mh-btn mh-btn-ghost"
+                                                type="button"
+                                                onClick={() => {
+                                                    setIsBackoffice(true);
+
+                                                    if (isAdmin) {
+                                                        setPage("admin-users");
+                                                    } else if (isManager) {
+                                                        setPage("films-moderation");
+                                                    }
+                                                }}
+                                            >
+                                                🔧 Backoffice
+                                            </button>
+                                        )}
+
+                                        <button
+                                            className="mh-btn mh-btn-danger"
+                                            type="button"
+                                            onClick={onLogout}
+                                        >
+                                            Déconnexion
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button
+                                            className="mh-btn mh-btn-ghost"
+                                            type="button"
+                                            onClick={() => setPage("login")}
+                                        >
+                                            Connexion
+                                        </button>
+
+                                        <button
+                                            className="mh-btn mh-btn-primary"
+                                            type="button"
+                                            onClick={() => setPage("newsletter")}
+                                        >
+                                            Newsletter
+                                        </button>
+                                    </>
+                                )}
                             </div>
 
-                            <div className="hp-langs" aria-label="Langue">
-                                <button className="hp-flag" type="button" aria-label="Français">
-                                    <svg viewBox="0 0 3 2" width="24" height="24">
-                                        <rect width="1" height="2" fill="#0055A4" />
-                                        <rect x="1" width="1" height="2" fill="#FFFFFF" />
-                                        <rect x="2" width="1" height="2" fill="#EF4135" />
-                                    </svg>
-                                </button>
-
-                                <button className="hp-flag" type="button" aria-label="English">
-                                    <svg viewBox="0 0 60 30" width="24" height="24">
-                                        <clipPath id="t">
-                                            <path d="M0,0 v30 h60 v-30 z" />
-                                        </clipPath>
-                                        <path d="M0,0 v30 h60 v-30 z" fill="#012169" />
-                                        <path d="M0,0 L60,30 M60,0 L0,30" stroke="#FFF" strokeWidth="6" />
-                                        <path d="M0,0 L60,30 M60,0 L0,30" stroke="#C8102E" strokeWidth="4" clipPath="url(#t)" />
-                                        <path d="M30,0 v30 M0,15 h60" stroke="#FFF" strokeWidth="10" />
-                                        <path d="M30,0 v30 M0,15 h60" stroke="#C8102E" strokeWidth="6" />
-                                    </svg>
-                                </button>
-                            </div>
+                            <button
+                                className="mh-mobileToggle"
+                                type="button"
+                                aria-label="Ouvrir le menu"
+                                aria-expanded={isMobileOpen}
+                                onClick={() => setIsMobileOpen((v) => !v)}
+                            >
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                    <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z" />
+                                </svg>
+                            </button>
                         </div>
-                    </>
+                    </div>
                 )}
             </nav>
         </header>

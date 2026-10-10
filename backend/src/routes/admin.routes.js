@@ -1,4 +1,5 @@
 // src/routes/admin.routes.js
+
 import express from "express";
 import authMiddleware from "../middlewares/auth.middleware.js";
 import requireRoles from "../middlewares/requireRoles.middleware.js";
@@ -7,12 +8,14 @@ import bcrypt from "bcrypt";
 export default function createAdminRoutes(db) {
     const router = express.Router();
 
-    // 🔒 ADMIN : statistiques dashboard
-    // GET /api/v1/admin/stats
+    // ============================================================
+    // STATS DU BACKOFFICE
+    // ADMIN + MANAGER peuvent voir les statistiques
+    // ============================================================
     router.get(
         "/stats",
         authMiddleware,
-        requireRoles(["ADMIN"]),
+        requireRoles(["ADMIN", "MANAGER"]),
         async (req, res) => {
             try {
                 const [
@@ -24,6 +27,7 @@ export default function createAdminRoutes(db) {
                     [realisateursTotalRows],
                     [juryTotalRows],
                     [adminTotalRows],
+                    [managerTotalRows],
                 ] = await Promise.all([
                     db.execute("SELECT COUNT(*) AS total FROM film"),
                     db.execute("SELECT COUNT(*) AS total FROM film WHERE statut_moderation = 'en attente'"),
@@ -33,6 +37,7 @@ export default function createAdminRoutes(db) {
                     db.execute("SELECT COUNT(*) AS total FROM utilisateur WHERE nom_role = 'REALISATEUR'"),
                     db.execute("SELECT COUNT(*) AS total FROM utilisateur WHERE nom_role = 'JURY'"),
                     db.execute("SELECT COUNT(*) AS total FROM utilisateur WHERE nom_role = 'ADMIN'"),
+                    db.execute("SELECT COUNT(*) AS total FROM utilisateur WHERE nom_role = 'MANAGER'"),
                 ]);
 
                 res.json({
@@ -49,6 +54,7 @@ export default function createAdminRoutes(db) {
                         realisateurs: realisateursTotalRows[0].total,
                         jury: juryTotalRows[0].total,
                         admin: adminTotalRows[0].total,
+                        manager: managerTotalRows[0].total,
                     },
                 });
             } catch (err) {
@@ -59,12 +65,13 @@ export default function createAdminRoutes(db) {
     );
 
     // ============================================================
-    // ✅ ADMIN : CRUD utilisateurs (isolé, ne casse rien d’existant)
-    // Base: /api/v1/admin/users
+    // GESTION DES UTILISATEURS
+    // Tout ce bloc reste ADMIN uniquement
+    // Le manager ne peut pas valider ni modifier les comptes
     // ============================================================
 
     // GET /api/v1/admin/users
-    // ✅ supporte ?actif=1 ou ?actif=0 (sinon: tout)
+    // supporte ?actif=1 ou ?actif=0
     router.get(
         "/users",
         authMiddleware,
@@ -76,7 +83,7 @@ export default function createAdminRoutes(db) {
                 let sql = "SELECT id_utilisateur, nom, prenom, email, nom_role, date_inscription, actif FROM utilisateur";
                 const params = [];
 
-                // si actif est fourni (0 ou 1)
+                // si actif est passé dans l'url
                 if (actif === "0" || actif === "1") {
                     sql += " WHERE actif = ?";
                     params.push(Number(actif));
@@ -94,6 +101,7 @@ export default function createAdminRoutes(db) {
     );
 
     // POST /api/v1/admin/users
+    // création manuelle d'un utilisateur par l'admin
     router.post(
         "/users",
         authMiddleware,
@@ -103,10 +111,12 @@ export default function createAdminRoutes(db) {
                 const { nom, prenom, email, mot_de_passe, nom_role, actif } = req.body;
 
                 if (!nom || !prenom || !email || !mot_de_passe) {
-                    return res.status(400).json({ message: "nom, prenom, email, mot_de_passe requis" });
+                    return res.status(400).json({
+                        message: "nom, prenom, email, mot_de_passe requis"
+                    });
                 }
 
-                const allowedRoles = ["PUBLIC", "JURY", "REALISATEUR", "ADMIN"];
+                const allowedRoles = ["PUBLIC", "JURY", "REALISATEUR", "ADMIN", "MANAGER"];
                 const roleFinal = allowedRoles.includes(nom_role) ? nom_role : "PUBLIC";
 
                 const hash = await bcrypt.hash(String(mot_de_passe), 10);
@@ -129,6 +139,7 @@ export default function createAdminRoutes(db) {
     );
 
     // PUT /api/v1/admin/users/:id
+    // modification d'un utilisateur
     router.put(
         "/users/:id",
         authMiddleware,
@@ -136,14 +147,17 @@ export default function createAdminRoutes(db) {
         async (req, res) => {
             try {
                 const id = Number(req.params.id);
-                if (!Number.isInteger(id)) return res.status(400).json({ message: "id invalide" });
+
+                if (!Number.isInteger(id)) {
+                    return res.status(400).json({ message: "id invalide" });
+                }
 
                 const { nom, prenom, email, mot_de_passe, nom_role, actif } = req.body;
 
-                const allowedRoles = ["PUBLIC", "JURY", "REALISATEUR", "ADMIN"];
+                const allowedRoles = ["PUBLIC", "JURY", "REALISATEUR", "ADMIN", "MANAGER"];
                 const roleFinal = allowedRoles.includes(nom_role) ? nom_role : "PUBLIC";
 
-                // update sans changer le mdp si vide
+                // si un nouveau mot de passe est envoyé
                 if (mot_de_passe && String(mot_de_passe).trim() !== "") {
                     const hash = await bcrypt.hash(String(mot_de_passe), 10);
 
@@ -162,10 +176,14 @@ export default function createAdminRoutes(db) {
                         ]
                     );
 
-                    if (result.affectedRows === 0) return res.status(404).json({ message: "Utilisateur non trouvé" });
+                    if (result.affectedRows === 0) {
+                        return res.status(404).json({ message: "Utilisateur non trouvé" });
+                    }
+
                     return res.json({ message: "Utilisateur mis à jour ✅" });
                 }
 
+                // mise à jour sans changer le mot de passe
                 const [result] = await db.execute(
                     `UPDATE utilisateur
                      SET nom = ?, prenom = ?, email = ?, nom_role = ?, actif = ?
@@ -180,7 +198,10 @@ export default function createAdminRoutes(db) {
                     ]
                 );
 
-                if (result.affectedRows === 0) return res.status(404).json({ message: "Utilisateur non trouvé" });
+                if (result.affectedRows === 0) {
+                    return res.status(404).json({ message: "Utilisateur non trouvé" });
+                }
+
                 res.json({ message: "Utilisateur mis à jour ✅" });
             } catch (err) {
                 if (err.code === "ER_DUP_ENTRY") {
@@ -193,7 +214,7 @@ export default function createAdminRoutes(db) {
     );
 
     // DELETE /api/v1/admin/users/:id
-    //  désactivation (évite problèmes FK films/votes)
+    // on désactive au lieu de supprimer vraiment
     router.delete(
         "/users/:id",
         authMiddleware,
@@ -201,14 +222,19 @@ export default function createAdminRoutes(db) {
         async (req, res) => {
             try {
                 const id = Number(req.params.id);
-                if (!Number.isInteger(id)) return res.status(400).json({ message: "id invalide" });
+
+                if (!Number.isInteger(id)) {
+                    return res.status(400).json({ message: "id invalide" });
+                }
 
                 const [result] = await db.execute(
                     "UPDATE utilisateur SET actif = 0 WHERE id_utilisateur = ?",
                     [id]
                 );
 
-                if (result.affectedRows === 0) return res.status(404).json({ message: "Utilisateur non trouvé" });
+                if (result.affectedRows === 0) {
+                    return res.status(404).json({ message: "Utilisateur non trouvé" });
+                }
 
                 res.json({ message: "Utilisateur désactivé ✅" });
             } catch (err) {

@@ -1,37 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import { apiFetch } from "../services/api.js";
+import "./RegisterPage.css";
+import AnimatedJuryTitle from "../components/AnimatedJuryTitle.jsx";
 
 function RegisterPage({ setUser, setPage }) {
     const [form, setForm] = useState({
-        nom: '',
-        prenom: '',
-        email: '',
-        mot_de_passe: '',
-        nom_role: 'REALISATEUR'
+        nom: "",
+        prenom: "",
+        email: "",
+        mot_de_passe: "",
+        nom_role: "JURY",
     });
-    const [error, setError] = useState('');
+
+    const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
+        setError("");
         setLoading(true);
 
         try {
-            const res = await fetch('http://localhost:8081/api/v1/utilisateurs', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form),
+            await apiFetch("/api/v1/utilisateurs/register", {
+                method: "POST",
+                body: JSON.stringify({
+                    nom: form.nom,
+                    prenom: form.prenom,
+                    email: form.email,
+                    mot_de_passe: form.mot_de_passe,
+                    nom_role: form.nom_role,
+                }),
             });
 
-            if (res.ok) {
-                const userData = await res.json();
-                setUser(userData);
-                setPage('home');
-            } else {
-                setError('Erreur lors de l\'inscription');
-            }
+            // après inscription on renvoie vers connexion
+            setPage("login");
         } catch (err) {
-            setError('Erreur serveur');
+            setError(err.message || "Erreur lors de l'inscription");
         } finally {
             setLoading(false);
         }
@@ -45,7 +49,7 @@ function RegisterPage({ setUser, setPage }) {
         <div className="auth-page">
             <div className="auth-card">
                 <div className="auth-header">
-                    <h1> S'inscrire</h1>
+                    <AnimatedJuryTitle text="S'inscrire" />
                     <p>Rejoignez MARSIA 2026</p>
                 </div>
 
@@ -90,26 +94,35 @@ function RegisterPage({ setUser, setPage }) {
                             placeholder="Mot de passe *"
                             value={form.mot_de_passe}
                             onChange={handleChange}
-                            minLength="6"
+                            minLength={6}
                             required
                         />
                     </div>
 
                     <div className="form-row">
-                        <select name="nom_role" value={form.nom_role} onChange={handleChange}>
-                            <option value="REALISATEUR">Réalisateur</option>
-                            <option value="PUBLIC">Public</option>
+                        <select
+                            name="nom_role"
+                            value={form.nom_role}
+                            onChange={handleChange}
+                            required
+                        >
                             <option value="JURY">Jury</option>
+                            <option value="MANAGER">Manager du site</option>
                         </select>
                     </div>
 
                     <button type="submit" className="btn-primary btn-large" disabled={loading}>
-                        {loading ? 'Inscription...' : 'S\'inscrire gratuitement'}
+                        {loading ? "Inscription..." : "S'inscrire"}
                     </button>
                 </form>
 
                 <div className="auth-footer">
-                    <p>Déjà inscrit ? <button onClick={() => setPage('login')} className="link-btn">Se connecter</button></p>
+                    <p>
+                        Déjà inscrit ?{" "}
+                        <button onClick={() => setPage("login")} className="link-btn">
+                            Se connecter
+                        </button>
+                    </p>
                 </div>
             </div>
         </div>

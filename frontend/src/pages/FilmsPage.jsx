@@ -1,6 +1,6 @@
-// src/pages/FilmsPage.jsx
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../services/api.js";
+import AnimatedJuryTitle from "../components/AnimatedJuryTitle.jsx";
 
 function FilmsPage({ setPage }) {
     const [films, setFilms] = useState([]);
@@ -8,9 +8,22 @@ function FilmsPage({ setPage }) {
     const [actionLoadingId, setActionLoadingId] = useState(null);
     const [error, setError] = useState("");
 
+    const BACKEND_ORIGIN = "http://localhost:8081";
+
+    const getVideoUrl = (fichier_video) => {
+        if (!fichier_video) return null;
+
+        if (String(fichier_video).startsWith("/uploads/")) {
+            return `${BACKEND_ORIGIN}${fichier_video}`;
+        }
+
+        return `${BACKEND_ORIGIN}/uploads/films/${fichier_video}`;
+    };
+
     const fetchEnAttente = async () => {
         setError("");
         setLoading(true);
+
         try {
             const data = await apiFetch("/api/v1/films/en-attente");
             setFilms(Array.isArray(data) ? data : []);
@@ -36,7 +49,6 @@ function FilmsPage({ setPage }) {
                 body: JSON.stringify({ statut_moderation: statut }),
             });
 
-            // ✅ On retire le film de la liste (car plus "en attente")
             setFilms((prev) => prev.filter((f) => f.id_film !== idFilm));
         } catch (e) {
             setError(e.message || "Erreur serveur");
@@ -46,138 +58,120 @@ function FilmsPage({ setPage }) {
     };
 
     return (
-        <div style={{ padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <div>
-                    <h1 style={{ margin: 0 }}>🎬 Modération des films</h1>
-                    <p style={{ marginTop: 6, opacity: 0.8 }}>
-                        Films en attente : <strong>{films.length}</strong>
-                    </p>
+        <div className="admin-content admin-films-page">
+            {/* HEADER */}
+            <div className="page-header admin-films-header">
+                <div className="admin-films-titleArea">
+                    <AnimatedJuryTitle text="Modération des films" />
                 </div>
 
-                <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => setPage?.("home")} style={btnSecondary}>
+                <div className="page-actions admin-films-actions">
+                    <button className="btn-secondary" onClick={() => setPage?.("home")}>
                         ← Accueil
                     </button>
-                    <button onClick={fetchEnAttente} disabled={loading} style={btnPrimary}>
-                        {loading ? "⏳ Rafraîchir..." : "🔄 Rafraîchir"}
+
+                    <button className="btn-primary" onClick={fetchEnAttente} disabled={loading}>
+                        {loading ? "⏳ ..." : "🔄 Rafraîchir"}
                     </button>
                 </div>
             </div>
 
-            {error && (
-                <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "#ffe9e9", color: "#8a1f1f" }}>
-                    ❌ {error}
-                </div>
-            )}
+            {/* compteur */}
+            <div className="admin-films-intro">
+                <p>Films en attente : <strong>{films.length}</strong></p>
+            </div>
 
-            <div style={{ marginTop: 16 }}>
+            {error && <div className="error-banner">❌ {error}</div>}
+
+            {/* CONTENU */}
+            <div className="admin-films-content">
                 {loading ? (
-                    <div style={{ padding: 12 }}>Chargement...</div>
+                    <div className="table-section">
+                        <div className="loading">Chargement...</div>
+                    </div>
                 ) : films.length === 0 ? (
-                    <div style={{ padding: 12, border: "1px dashed #bbb", borderRadius: 10 }}>✅ Aucun film en attente.</div>
+                    <div className="table-section">
+                        <div className="admin-films-empty">
+                            ✅ Aucun film en attente.
+                        </div>
+                    </div>
                 ) : (
-                    <div style={{ display: "grid", gap: 12 }}>
-                        {films.map((f) => (
-                            <div key={f.id_film} style={card}>
-                                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                                    <div>
-                                        <div style={{ fontSize: 18, fontWeight: 700 }}>
-                                            #{f.id_film} — {f.titre}
+                    <div className="admin-films-grid">
+                        {films.map((f) => {
+                            const videoUrl = getVideoUrl(f.fichier_video);
+
+                            return (
+                                <div key={f.id_film} className="admin-films-card">
+                                    {/* HEADER CARD */}
+                                    <div className="admin-films-cardHeader">
+                                        <div>
+                                            <div className="admin-films-title">
+                                                #{f.id_film} — {f.titre}
+                                            </div>
+
+                                            <div className="admin-films-meta">
+                                                👤 {f.realisateur_prenom} {f.realisateur_nom}
+                                            </div>
+
+                                            <div className="admin-films-meta">
+                                                🌍 {f.pays || "N/A"} • ⏱️ {f.duree_secondes ?? "N/A"} sec
+                                            </div>
                                         </div>
-                                        <div style={{ marginTop: 6, opacity: 0.85 }}>
-                                            👤 {f.realisateur_prenom} {f.realisateur_nom}{" "}
-                                            {f.realisateur_email ? <span style={{ opacity: 0.7 }}>({f.realisateur_email})</span> : null}
-                                        </div>
-                                        <div style={{ marginTop: 6, opacity: 0.85 }}>
-                                            🌍 {f.pays || "N/A"} • ⏱️ {f.duree_secondes ?? "N/A"} sec
+
+                                        {/* ACTIONS */}
+                                        <div className="admin-films-actionsButtons">
+                                            <button
+                                                className="btn-vote-approve"
+                                                disabled={actionLoadingId === f.id_film}
+                                                onClick={() => moderer(f.id_film, "approuve")}
+                                            >
+                                                {actionLoadingId === f.id_film ? "⏳" : "✅"}
+                                            </button>
+
+                                            <button
+                                                className="btn-vote-reject"
+                                                disabled={actionLoadingId === f.id_film}
+                                                onClick={() => moderer(f.id_film, "rejete")}
+                                            >
+                                                {actionLoadingId === f.id_film ? "⏳" : "❌"}
+                                            </button>
                                         </div>
                                     </div>
 
-                                    <div style={{ display: "flex", gap: 8, alignItems: "start" }}>
-                                        <button
-                                            style={btnApprove}
-                                            disabled={actionLoadingId === f.id_film}
-                                            onClick={() => moderer(f.id_film, "approuve")}
-                                        >
-                                            {actionLoadingId === f.id_film ? "⏳" : "✅ Approuver"}
-                                        </button>
-                                        <button
-                                            style={btnReject}
-                                            disabled={actionLoadingId === f.id_film}
-                                            onClick={() => moderer(f.id_film, "rejete")}
-                                        >
-                                            {actionLoadingId === f.id_film ? "⏳" : "❌ Rejeter"}
-                                        </button>
+                                    {/* DESCRIPTION */}
+                                    {f.description && (
+                                        <div className="admin-films-description">
+                                            <strong>Description :</strong> {f.description}
+                                        </div>
+                                    )}
+
+                                    {/* VIDEO */}
+                                    {videoUrl && (
+                                        <div className="admin-films-video">
+                                            <video src={videoUrl} controls />
+                                        </div>
+                                    )}
+
+                                    {/* YOUTUBE */}
+                                    {f.lien_youtube && (
+                                        <div className="admin-films-link">
+                                            <a href={f.lien_youtube} target="_blank" rel="noreferrer">
+                                                🔗 Voir YouTube
+                                            </a>
+                                        </div>
+                                    )}
+
+                                    <div className="admin-films-status">
+                                        Statut : <strong>{f.statut_moderation}</strong>
                                     </div>
                                 </div>
-
-                                {f.description ? (
-                                    <div style={{ marginTop: 10, opacity: 0.9 }}>
-                                        <strong>Description :</strong> {f.description}
-                                    </div>
-                                ) : null}
-
-                                {f.lien_youtube ? (
-                                    <div style={{ marginTop: 10 }}>
-                                        <a href={f.lien_youtube} target="_blank" rel="noreferrer">
-                                            🔗 Voir lien YouTube
-                                        </a>
-                                    </div>
-                                ) : null}
-
-                                <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
-                                    Statut actuel : <strong>{f.statut_moderation}</strong>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
         </div>
     );
 }
-
-const card = {
-    padding: 14,
-    borderRadius: 12,
-    border: "1px solid #e3e3e3",
-    background: "white",
-};
-
-const btnPrimary = {
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #111",
-    background: "#111",
-    color: "white",
-    cursor: "pointer",
-};
-
-const btnSecondary = {
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #bbb",
-    background: "white",
-    cursor: "pointer",
-};
-
-const btnApprove = {
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #1f7a1f",
-    background: "#1f7a1f",
-    color: "white",
-    cursor: "pointer",
-};
-
-const btnReject = {
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #b52a2a",
-    background: "#b52a2a",
-    color: "white",
-    cursor: "pointer",
-};
 
 export default FilmsPage;

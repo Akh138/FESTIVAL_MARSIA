@@ -1,0 +1,786 @@
+/* =========================================================
+   JuryDashboardPage.css
+   ---------------------------------------------------------
+   Version propre et stable du dashboard jury
+   Objectifs :
+   - garder tout ce qui fonctionne
+   - afficher "À voter" comme "Déjà votés"
+   - améliorer légèrement le rendu sans casser
+   - harmoniser le bouton "Voter" avec le style badge / bleu
+   ========================================================= */
+
+
+/* =========================================================
+   1) Base de page
+   Variables globales, couleurs, ombres, dimensions
+   ========================================================= */
+
+.page-container.juryDash {
+    --jd-radius: 18px;
+    --jd-radius-lg: 24px;
+
+    --jd-border: 1px solid rgba(255, 255, 255, 0.10);
+    --jd-border-soft: 1px solid rgba(255, 255, 255, 0.08);
+
+    --jd-glow: 0 14px 40px rgba(0, 0, 0, 0.30);
+    --jd-glow-soft: 0 8px 22px rgba(0, 0, 0, 0.22);
+
+    --jd-text: rgba(255, 255, 255, 0.94);
+    --jd-muted: rgba(255, 255, 255, 0.68);
+
+    --jd-panel: rgba(10, 14, 28, 0.55);
+    --jd-panel-2: rgba(8, 12, 22, 0.72);
+
+    color: var(--jd-text);
+    max-width: 1680px;
+    margin: 0 auto;
+    padding: 14px 20px 20px;
+    box-sizing: border-box;
+    transform-origin: top center;
+}
+
+
+/* =========================================================
+   2) Header
+   Titre centré, actions à droite
+   ========================================================= */
+
+.page-container.juryDash .page-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.page-container.juryDash .page-header > div:first-child {
+    grid-column: 2;
+    text-align: center;
+}
+
+.page-container.juryDash .page-header h1 {
+    font-family: "Sora", sans-serif;
+    margin: 0;
+    font-size: clamp(32px, 3.2vw, 52px);
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    text-shadow:
+            0 2px 10px rgba(0, 0, 0, 0.25),
+            0 0 20px rgba(255, 255, 255, 0.08);
+}
+
+.page-container.juryDash .page-header p {
+    display: none;
+}
+
+.page-container.juryDash .page-header h1 svg,
+.page-container.juryDash .page-header h1 img {
+    display: none;
+}
+
+.page-container.juryDash .page-actions {
+    grid-column: 3;
+    justify-self: end;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+
+/* =========================================================
+   3) Bandeau erreur
+   ========================================================= */
+
+.page-container.juryDash .error-banner {
+    border: 1px solid rgba(239, 68, 68, 0.22);
+    border-radius: var(--jd-radius);
+    background: rgba(239, 68, 68, 0.10);
+    box-shadow: var(--jd-glow-soft);
+    padding: 14px 16px;
+    margin-bottom: 14px;
+}
+
+
+/* =========================================================
+   4) Carte générique
+   Style de base partagé par plusieurs blocs
+   ========================================================= */
+
+.page-container.juryDash .card {
+    position: relative;
+    overflow: hidden;
+    border: var(--jd-border);
+    border-radius: var(--jd-radius);
+    background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+            var(--jd-panel);
+    box-shadow: var(--jd-glow);
+    backdrop-filter: blur(10px);
+}
+
+.page-container.juryDash .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(700px 180px at 10% 0%, rgba(255, 255, 255, 0.05), transparent 55%);
+}
+
+
+/* =========================================================
+   5) Résumé du haut
+   Les 3 cartes KPI
+   ========================================================= */
+
+.page-container.juryDash .jd-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.page-container.juryDash .jd-summary .card {
+    padding: 16px;
+    min-height: 110px;
+    border: 1px solid rgba(120, 210, 255, 0.22) !important;
+    box-shadow:
+            0 0 0 1px rgba(120, 210, 255, 0.08),
+            0 0 14px rgba(70, 160, 255, 0.10),
+            0 0 26px rgba(40, 120, 255, 0.07),
+            0 12px 40px rgba(0, 0, 0, 0.30),
+            inset 0 0 8px rgba(120, 200, 255, 0.03) !important;
+}
+
+.page-container.juryDash .jd-summary .card::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+            0 0 10px rgba(120, 210, 255, 0.10),
+            0 0 20px rgba(70, 160, 255, 0.08);
+    opacity: 0.85;
+}
+
+.page-container.juryDash .jd-summary .card:hover {
+    border-color: rgba(140, 220, 255, 0.30) !important;
+    box-shadow:
+            0 0 0 1px rgba(140, 220, 255, 0.10),
+            0 0 16px rgba(90, 180, 255, 0.12),
+            0 0 28px rgba(60, 130, 255, 0.09),
+            0 12px 40px rgba(0, 0, 0, 0.30),
+            inset 0 0 8px rgba(140, 220, 255, 0.03) !important;
+}
+
+.page-container.juryDash .jd-summary h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.page-container.juryDash .jd-kpi {
+    font-size: clamp(32px, 3vw, 42px);
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.04em;
+}
+
+.page-container.juryDash .jd-kpiSub {
+    margin-top: 6px;
+    color: var(--jd-muted);
+    font-size: 0.96rem;
+}
+
+
+/* =========================================================
+   6) Layout principal
+   Contient les blocs "À voter" et "Déjà votés"
+   ========================================================= */
+
+.page-container.juryDash .jd-layout {
+    display: grid;
+    gap: 14px;
+}
+
+.page-container.juryDash .jd-block,
+.page-container.juryDash .jd-block-small {
+    padding: 14px !important;
+}
+
+.page-container.juryDash .jd-layout > .card.jd-block,
+.page-container.juryDash .jd-layout > .card.jd-block-small {
+    border: 1px solid rgba(110, 190, 255, 0.18) !important;
+    box-shadow:
+            0 0 0 1px rgba(110, 190, 255, 0.05),
+            0 0 12px rgba(70, 150, 255, 0.08),
+            0 0 22px rgba(40, 120, 255, 0.05),
+            0 14px 40px rgba(0, 0, 0, 0.30),
+            inset 0 0 8px rgba(120, 200, 255, 0.02) !important;
+}
+
+.page-container.juryDash .jd-layout > .card.jd-block::after,
+.page-container.juryDash .jd-layout > .card.jd-block-small::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+            0 0 8px rgba(110, 190, 255, 0.08),
+            0 0 18px rgba(70, 150, 255, 0.06);
+    opacity: 0.75;
+}
+
+.page-container.juryDash .jd-layout > .card.jd-block:hover,
+.page-container.juryDash .jd-layout > .card.jd-block-small:hover {
+    border-color: rgba(125, 205, 255, 0.24) !important;
+    box-shadow:
+            0 0 0 1px rgba(125, 205, 255, 0.07),
+            0 0 14px rgba(85, 170, 255, 0.10),
+            0 0 26px rgba(50, 130, 255, 0.06),
+            0 14px 40px rgba(0, 0, 0, 0.30),
+            inset 0 0 10px rgba(125, 205, 255, 0.03) !important;
+}
+
+
+/* =========================================================
+   7) En-têtes de section
+   ========================================================= */
+
+.page-container.juryDash .jd-sectionTitle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.page-container.juryDash .jd-sectionTitle h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+}
+
+.page-container.juryDash .jd-sectionSub {
+    margin-top: 4px;
+    color: var(--jd-muted);
+    opacity: 0.9;
+    font-size: 0.95rem;
+}
+
+.page-container.juryDash .jd-count {
+    min-width: 36px;
+    height: 36px;
+    padding: 0 11px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 0.98rem;
+}
+
+
+/* =========================================================
+   8) État vide
+   ========================================================= */
+
+.page-container.juryDash .jd-empty {
+    margin-top: 10px;
+    padding: 6px 2px 2px;
+    color: rgba(255, 255, 255, 0.84);
+    font-size: 0.98rem;
+}
+
+
+/* =========================================================
+   9) Grille commune des films
+   Utilisée par :
+   - À voter
+   - Déjà votés
+   ========================================================= */
+
+.page-container.juryDash .jd-filmGrid {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.page-container.juryDash .jd-filmGridItem {
+    min-width: 0;
+}
+
+
+/* =========================================================
+   10) Carte film
+   Conteneur principal d’un film
+   ========================================================= */
+
+.page-container.juryDash .jd-filmCard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+    border-radius: var(--jd-radius-lg);
+    overflow: hidden;
+    border: 1px solid rgba(110, 190, 255, 0.14) !important;
+    background:
+            linear-gradient(
+                    115deg,
+                    transparent 0%,
+                    transparent 35%,
+                    rgba(170, 225, 255, 0.025) 48%,
+                    rgba(120, 205, 255, 0.06) 50%,
+                    rgba(170, 225, 255, 0.025) 52%,
+                    transparent 65%,
+                    transparent 100%
+            ),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+            rgba(7, 11, 20, 0.88);
+    background-size: 220% 100%, 100% 100%, 100% 100%;
+    background-position: -140% 0, 0 0, 0 0;
+    background-repeat: no-repeat;
+    animation: jdFilmSweepBg 8s ease-in-out infinite;
+    box-shadow:
+            0 0 0 1px rgba(110, 190, 255, 0.04),
+            0 0 10px rgba(70, 150, 255, 0.06),
+            0 0 20px rgba(40, 120, 255, 0.04),
+            0 10px 24px rgba(0, 0, 0, 0.24),
+            inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+    transition:
+            transform 0.22s ease,
+            box-shadow 0.22s ease,
+            border-color 0.22s ease,
+            filter 0.22s ease;
+}
+
+.page-container.juryDash .jd-filmCard::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+            0 0 8px rgba(110, 190, 255, 0.07),
+            0 0 16px rgba(70, 150, 255, 0.05);
+    opacity: 0.7;
+}
+
+.page-container.juryDash .jd-filmCard:hover {
+    transform: translateY(-4px);
+    box-shadow:
+            0 14px 30px rgba(0, 0, 0, 0.28),
+            0 0 0 1px rgba(130, 210, 255, 0.07),
+            0 0 14px rgba(90, 170, 255, 0.10),
+            0 0 24px rgba(50, 130, 255, 0.06),
+            inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+    border-color: rgba(130, 210, 255, 0.22) !important;
+    filter: saturate(1.03);
+}
+
+
+/* =========================================================
+   11) Haut de carte
+   Titre, meta, description, actions
+   ========================================================= */
+
+.page-container.juryDash .jd-filmTop {
+    display: block;
+    padding: 14px 14px 10px;
+    position: relative;
+    z-index: 2;
+}
+
+.page-container.juryDash .jd-filmInfo {
+    min-width: 0;
+}
+
+.page-container.juryDash .jd-filmTitle {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.12;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    word-break: break-word;
+    text-wrap: balance;
+}
+
+.page-container.juryDash .jd-filmMeta {
+    margin-top: 6px;
+    display: grid;
+    gap: 5px;
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 0.92rem;
+    line-height: 1.35;
+}
+
+.page-container.juryDash .jd-filmDescription {
+    margin-top: 10px;
+    opacity: 0.95;
+    line-height: 1.45;
+    min-height: 48px;
+}
+
+.page-container.juryDash .jd-actions {
+    margin-top: 14px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+
+/* =========================================================
+   12) Zone média
+   Vidéo / iframe
+   ========================================================= */
+
+.page-container.juryDash .jd-media {
+    position: relative;
+    margin-top: auto;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 0;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.page-container.juryDash .jd-media::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+            to top,
+            rgba(0, 0, 0, 0.18),
+            rgba(0, 0, 0, 0.04) 30%,
+            transparent 55%
+    );
+    z-index: 1;
+}
+
+.page-container.juryDash .jd-media iframe,
+.page-container.juryDash .jd-media video {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: 0;
+    position: relative;
+    z-index: 0;
+    transition: transform 0.35s ease;
+}
+
+.page-container.juryDash .jd-media iframe {
+    object-fit: cover;
+}
+
+.page-container.juryDash .jd-media video {
+    object-fit: contain;
+    background: #000;
+}
+
+.page-container.juryDash .jd-filmCard:hover .jd-media iframe {
+    transform: scale(1.02);
+}
+
+.page-container.juryDash .jd-filmCard:hover .jd-media video {
+    transform: scale(1.01);
+}
+
+.page-container.juryDash .jd-noMedia {
+    padding: 12px;
+    opacity: 0.75;
+    text-align: center;
+}
+
+
+/* =========================================================
+   13) Badge "mon vote"
+   Partie Déjà votés
+   ========================================================= */
+
+.page-container.juryDash .jd-voteBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(120, 210, 255, 0.12), rgba(70, 160, 255, 0.08));
+    border: 1px solid rgba(120, 210, 255, 0.24);
+    color: rgba(255, 255, 255, 0.98);
+    font-weight: 900;
+    font-size: 0.92rem;
+    box-shadow:
+            0 0 0 1px rgba(120, 210, 255, 0.05),
+            0 0 10px rgba(70, 160, 255, 0.10),
+            0 0 18px rgba(40, 120, 255, 0.06),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+
+/* =========================================================
+   14) Bouton Voter
+   Version améliorée visuellement
+   - même esprit bleu / glass / glow
+   - sans casser le comportement existant
+   ========================================================= */
+
+.page-container.juryDash .jd-voteActionBtn {
+    min-height: 46px;
+    padding: 0 22px !important;
+    border-radius: 999px;
+    font-size: 1rem;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.98) !important;
+    border: 1px solid rgba(120, 210, 255, 0.28) !important;
+    background:
+            linear-gradient(180deg, rgba(120, 210, 255, 0.14), rgba(70, 160, 255, 0.08)) !important;
+    box-shadow:
+            0 0 0 1px rgba(120, 210, 255, 0.05),
+            0 0 10px rgba(70, 160, 255, 0.10),
+            0 0 18px rgba(40, 120, 255, 0.06),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+.page-container.juryDash .jd-voteActionBtn:hover {
+    border-color: rgba(140, 220, 255, 0.36) !important;
+    background:
+            linear-gradient(180deg, rgba(130, 220, 255, 0.16), rgba(80, 170, 255, 0.10)) !important;
+    box-shadow:
+            0 0 0 1px rgba(140, 220, 255, 0.08),
+            0 0 14px rgba(90, 180, 255, 0.12),
+            0 0 22px rgba(50, 130, 255, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+.page-container.juryDash .jd-voteActionBtn:active {
+    transform: translateY(0);
+}
+
+
+/* =========================================================
+   15) Commentaire de vote
+   Affiché sous les cartes déjà votées
+   ========================================================= */
+
+.page-container.juryDash .jd-comment {
+    margin-top: 10px;
+    padding: 0 4px;
+    color: rgba(255, 255, 255, 0.82);
+    opacity: 0.95;
+    line-height: 1.5;
+    font-size: 0.94rem;
+}
+
+
+/* =========================================================
+   16) Modal de vote
+   ========================================================= */
+
+.page-container.juryDash .modal-overlay {
+    background: rgba(0, 0, 0, 0.62);
+    backdrop-filter: blur(8px);
+}
+
+.page-container.juryDash .modal-content {
+    border: var(--jd-border);
+    border-radius: 18px;
+    background: rgba(10, 14, 28, 0.88);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+}
+
+.page-container.juryDash .modal-header {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.page-container.juryDash .jd-modalSubTitle {
+    opacity: 0.85;
+}
+
+.page-container.juryDash .form-row label {
+    color: rgba(255, 255, 255, 0.84);
+}
+
+.page-container.juryDash .form-row input,
+.page-container.juryDash .form-row textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(0, 0, 0, 0.18);
+    color: white;
+    padding: 12px 14px;
+}
+
+.page-container.juryDash .form-row input:focus,
+.page-container.juryDash .form-row textarea:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+}
+
+
+/* =========================================================
+   17) Boutons globaux
+   Boutons standards du header et de la page
+   ========================================================= */
+
+.page-container.juryDash .btn-primary,
+.page-container.juryDash .btn-secondary {
+    position: relative;
+    overflow: hidden;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    font-weight: 800;
+    border: 1px solid rgba(120, 210, 255, 0.22) !important;
+    background: rgba(20, 35, 60, 0.35);
+    box-shadow:
+            0 0 0 1px rgba(120, 210, 255, 0.05),
+            0 0 10px rgba(70, 160, 255, 0.08),
+            0 0 18px rgba(40, 120, 255, 0.05);
+    backdrop-filter: blur(6px);
+    transition:
+            transform 0.18s ease,
+            opacity 0.18s ease,
+            box-shadow 0.18s ease,
+            border-color 0.18s ease;
+}
+
+.page-container.juryDash .btn-primary:hover,
+.page-container.juryDash .btn-secondary:hover {
+    border-color: rgba(140, 220, 255, 0.32);
+    box-shadow:
+            0 0 0 1px rgba(140, 220, 255, 0.08),
+            0 0 14px rgba(90, 180, 255, 0.12),
+            0 0 22px rgba(50, 130, 255, 0.08);
+    transform: translateY(-1px);
+}
+
+.page-container.juryDash .btn-primary::after,
+.page-container.juryDash .btn-secondary::after {
+    content: "";
+    position: absolute;
+    top: -30%;
+    left: -140%;
+    width: 70%;
+    height: 160%;
+    transform: rotate(18deg);
+    pointer-events: none;
+    background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(170, 225, 255, 0.02) 35%,
+            rgba(120, 205, 255, 0.10) 50%,
+            rgba(170, 225, 255, 0.02) 65%,
+            transparent 100%
+    );
+    animation: jdButtonSweep 7s ease-in-out infinite;
+}
+
+
+/* =========================================================
+   18) Animations
+   ========================================================= */
+
+@keyframes jdFilmSweepBg {
+    0% {
+        background-position: -140% 0, 0 0, 0 0;
+    }
+
+    45% {
+        background-position: 140% 0, 0 0, 0 0;
+    }
+
+    100% {
+        background-position: 140% 0, 0 0, 0 0;
+    }
+}
+
+@keyframes jdButtonSweep {
+    0% {
+        left: -140%;
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    45% {
+        left: 140%;
+        opacity: 1;
+    }
+
+    55% {
+        left: 140%;
+        opacity: 0;
+    }
+
+    100% {
+        left: 140%;
+        opacity: 0;
+    }
+}
+
+
+/* =========================================================
+   19) Responsive
+   ========================================================= */
+
+@media (max-width: 1400px) {
+    .page-container.juryDash .jd-filmGrid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1100px) {
+    .page-container.juryDash .jd-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .page-container.juryDash .jd-filmGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 820px) {
+    .page-container.juryDash .page-header {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+
+    .page-container.juryDash .page-header > div:first-child {
+        grid-column: auto;
+    }
+
+    .page-container.juryDash .page-actions {
+        grid-column: auto;
+        justify-self: center;
+        justify-content: center;
+    }
+
+    .page-container.juryDash .jd-filmGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .page-container.juryDash .page-header h1 {
+        font-size: clamp(28px, 8vw, 38px);
+        letter-spacing: -0.03em;
+    }
+}

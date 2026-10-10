@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { apiFetch, setToken } from "../services/api.js";
+import "./LoginPage.css";
+import AnimatedJuryTitle from "../components/AnimatedJuryTitle.jsx";
+
 
 function LoginPage({ setUser, setPage }) {
     const [form, setForm] = useState({
@@ -47,6 +50,9 @@ function LoginPage({ setUser, setPage }) {
                 case "ADMIN":
                     setPage("admin-users");
                     break;
+                case "MANAGER":
+                    setPage("films-moderation");
+                    break;
                 case "REALISATEUR":
                     setPage("soumission-film");
                     break;
@@ -67,7 +73,7 @@ function LoginPage({ setUser, setPage }) {
         <div className="auth-page">
             <div className="auth-card">
                 <div className="auth-header">
-                    <h1>🔐 Connexion</h1>
+                    <AnimatedJuryTitle text="Connexion" />
                     <p>Accédez à votre espace MARSIA</p>
                 </div>
 

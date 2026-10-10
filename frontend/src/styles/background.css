@@ -1,7 +1,6 @@
 /* src/styles/background.css
-   Fond global : image + glow léger + anim subtile
+   Fond global : VIDEO + glow léger
    ✅ S'applique directement au body
-   ✅ Aucun wrapper .marsia-bg nécessaire
 */
 
 /* =========================
@@ -21,7 +20,8 @@ body {
 }
 
 /* =========================
-   COUCHE 1 : image de fond
+   COUCHE 1 : voile sombre (SANS image)
+   -> on retire circuit-bg.jpeg pour éviter le double fond
    ========================= */
 
 body::before {
@@ -31,25 +31,13 @@ body::before {
     z-index: -2;
     pointer-events: none;
 
-    /* ⚠️ Chemin corrigé (important pour Vite/React) */
+    /* ✅ plus d'image ici : la vidéo est le fond */
     background:
-            linear-gradient(180deg, rgba(5,8,20,0.88), rgba(5,8,20,0.82)),
-            url("../assets/circuit-bg.jpeg");
+            radial-gradient(1200px 700px at 50% 10%, rgba(0,0,0,0.10), transparent 60%),
+            radial-gradient(900px 600px at 20% 80%, rgba(0,0,0,0.18), transparent 65%),
+            linear-gradient(180deg, rgba(5,8,20,0.82), rgba(5,8,20,0.92));
 
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-
-    /* Animation légère */
-    transform: translate3d(0,0,0) scale(1.03);
-    animation: none;
-    filter: saturate(1.08) contrast(1.06);
     opacity: 1;
-}
-
-@keyframes bgDrift {
-    from { transform: translate3d(-8px,-6px,0) scale(1.03); }
-    to   { transform: translate3d(10px,8px,0) scale(1.05); }
 }
 
 /* =========================
@@ -62,6 +50,7 @@ body::after {
     inset: 0;
     z-index: -1;
     pointer-events: none;
+
 
     background:
             radial-gradient(800px 500px at 25% 35%, rgba(56,189,248,0.12), transparent 62%),
@@ -109,18 +98,11 @@ body::after {
             70% 40%,
             35% 78%;
 
-    opacity: 0.9;
+    opacity: 1;
     mix-blend-mode: screen;
-    filter: blur(0.25px) drop-shadow(0 0 10px rgba(56,189,248,0.10));
+    filter: blur(0.15px) drop-shadow(0 0 18px rgba(56,189,248,0.18));
 
-    animation: none;
-}
-
-@keyframes glowPulse {
-    0%   { opacity: 0.65; transform: translate3d(0,0,0); }
-    40%  { opacity: 0.95; transform: translate3d(1px,-1px,0); }
-    70%  { opacity: 0.75; transform: translate3d(-1px,1px,0); }
-    100% { opacity: 0.65; transform: translate3d(0,0,0); }
+    animation: glowBreath 12s ease-in-out infinite;
 }
 
 /* =========================
@@ -132,4 +114,79 @@ body::after {
     body::after {
         animation: none !important;
     }
+}
+
+/* ===============================
+   BACKGROUND VIDEO GLOBAL
+================================= */
+.app-bgVideo{
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+
+    /* ✅ la vidéo doit être derrière le contenu ET derrière les couches glow */
+    z-index: -3;
+    pointer-events: none;
+
+    /* Réglages visuels */
+    opacity: 0.22;
+    filter: contrast(1.18) saturate(1.18) brightness(0.78);
+    transform: scale(1.02);
+}
+
+/* Tout le contenu au-dessus */
+#root,
+.app{
+    position: relative;
+    z-index: 1;
+}
+
+/* ===============================
+   CINEMA VIGNETTE (profondeur)
+================================= */
+
+.app::after{
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+
+    background:
+            radial-gradient(1200px 800px at 50% 50%, transparent 60%, rgba(0,0,0,0.35) 100%);
+
+    mix-blend-mode: multiply;
+}
+
+
+/* ===============================
+   FILM GRAIN (très subtil)
+================================= */
+
+.app::before{
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+
+    background-image:
+            repeating-linear-gradient(
+                    0deg,
+                    rgba(255,255,255,0.02) 0px,
+                    rgba(255,255,255,0.02) 1px,
+                    transparent 1px,
+                    transparent 2px
+            );
+
+    opacity: 0.25;
+    mix-blend-mode: overlay;
+}
+
+@keyframes glowBreath{
+    0%   { opacity: 0.85; transform: scale(1); }
+    50%  { opacity: 1; transform: scale(1.02); }
+    100% { opacity: 0.85; transform: scale(1); }
 }

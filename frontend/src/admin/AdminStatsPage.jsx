@@ -1,15 +1,22 @@
-// src/admin/AdminStatsPage.jsx
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../services/api.js";
+import AnimatedJuryTitle from "../components/AnimatedJuryTitle.jsx";
 
 function AdminStatsPage({ setPage }) {
+    // =========================================================
+    // États principaux
+    // =========================================================
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
+    // =========================================================
+    // Charge les statistiques admin
+    // =========================================================
     const fetchStats = async () => {
         setError("");
         setLoading(true);
+
         try {
             const data = await apiFetch("/api/v1/admin/stats");
             setStats(data);
@@ -26,56 +33,72 @@ function AdminStatsPage({ setPage }) {
     }, []);
 
     return (
-        <div style={{ padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                <div>
-                    <h1 style={{ margin: 0 }}>📊 Stats Admin</h1>
-                    <p style={{ marginTop: 6, opacity: 0.8 }}>
-                        Vue d’ensemble (films, votes, utilisateurs)
-                    </p>
+        <div className="admin-content admin-stats-page">
+            {/* =========================================================
+                Header de page
+                - titre animé centré
+                - actions à droite
+               ========================================================= */}
+            <div className="page-header admin-stats-header">
+                <div className="admin-stats-titleArea">
+                    <AnimatedJuryTitle text="Stats Admin" />
                 </div>
 
-                <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => setPage?.("home")} style={btnSecondary}>
+                <div className="page-actions admin-stats-actions">
+                    <button className="btn-secondary" onClick={() => setPage?.("home")}>
                         ← Accueil
                     </button>
-                    <button onClick={fetchStats} disabled={loading} style={btnPrimary}>
+
+                    <button className="btn-primary" onClick={fetchStats} disabled={loading}>
                         {loading ? "⏳ Rafraîchir..." : "🔄 Rafraîchir"}
                     </button>
                 </div>
             </div>
 
-            {error && (
-                <div style={{ marginTop: 14, padding: 12, borderRadius: 10, background: "#ffe9e9", color: "#8a1f1f" }}>
-                    ❌ {error}
-                </div>
-            )}
+            {/* =========================================================
+                Message d’erreur
+               ========================================================= */}
+            {error && <div className="error-banner">❌ {error}</div>}
 
-            <div style={{ marginTop: 16 }}>
+            {/* =========================================================
+                Sous-titre de page
+               ========================================================= */}
+            <div className="admin-stats-intro">
+                <p>Vue d’ensemble (films, votes, utilisateurs)</p>
+            </div>
+
+            {/* =========================================================
+                Contenu principal
+               ========================================================= */}
+            <div className="admin-stats-content">
                 {loading ? (
-                    <div style={{ padding: 12 }}>Chargement...</div>
+                    <div className="table-section admin-stats-stateBox">
+                        <div className="loading">Chargement...</div>
+                    </div>
                 ) : !stats ? (
-                    <div style={{ padding: 12, border: "1px dashed #bbb", borderRadius: 10 }}>
-                        Aucune donnée à afficher.
+                    <div className="table-section admin-stats-stateBox">
+                        <div className="admin-stats-empty">
+                            Aucune donnée à afficher.
+                        </div>
                     </div>
                 ) : (
-                    <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
-                        <Card title="🎬 Films">
-                            <Row label="Total" value={stats?.films?.total} />
-                            <Row label="En attente" value={stats?.films?.en_attente} />
-                            <Row label="Approuvés" value={stats?.films?.approuves} />
-                            <Row label="Rejetés" value={stats?.films?.rejetes} />
-                        </Card>
+                    <div className="admin-stats-grid">
+                        <StatsCard title="🎬 Films">
+                            <StatsRow label="Total" value={stats?.films?.total} />
+                            <StatsRow label="En attente" value={stats?.films?.en_attente} />
+                            <StatsRow label="Approuvés" value={stats?.films?.approuves} />
+                            <StatsRow label="Rejetés" value={stats?.films?.rejetes} />
+                        </StatsCard>
 
-                        <Card title="🗳️ Votes">
-                            <Row label="Total" value={stats?.votes?.total} />
-                        </Card>
+                        <StatsCard title="🗳️ Votes">
+                            <StatsRow label="Total" value={stats?.votes?.total} />
+                        </StatsCard>
 
-                        <Card title="👥 Utilisateurs">
-                            <Row label="Réalisateurs" value={stats?.utilisateurs?.realisateurs} />
-                            <Row label="Jury" value={stats?.utilisateurs?.jury} />
-                            <Row label="Admin" value={stats?.utilisateurs?.admin} />
-                        </Card>
+                        <StatsCard title="👥 Utilisateurs">
+                            <StatsRow label="Réalisateurs" value={stats?.utilisateurs?.realisateurs} />
+                            <StatsRow label="Jury" value={stats?.utilisateurs?.jury} />
+                            <StatsRow label="Admin" value={stats?.utilisateurs?.admin} />
+                        </StatsCard>
                     </div>
                 )}
             </div>
@@ -83,46 +106,30 @@ function AdminStatsPage({ setPage }) {
     );
 }
 
-function Card({ title, children }) {
+/* =========================================================
+   Carte statistique
+   Bloc visuel pour chaque famille de stats
+   ========================================================= */
+function StatsCard({ title, children }) {
     return (
-        <div style={card}>
-            <div style={{ fontWeight: 800, fontSize: 16 }}>{title}</div>
-            <div style={{ marginTop: 10, display: "grid", gap: 8 }}>{children}</div>
+        <div className="admin-stats-card">
+            <div className="admin-stats-cardTitle">{title}</div>
+            <div className="admin-stats-cardBody">{children}</div>
         </div>
     );
 }
 
-function Row({ label, value }) {
+/* =========================================================
+   Ligne de statistique
+   Affiche un libellé à gauche et une valeur à droite
+   ========================================================= */
+function StatsRow({ label, value }) {
     return (
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, opacity: 0.95 }}>
+        <div className="admin-stats-row">
             <span>{label}</span>
             <strong>{value ?? 0}</strong>
         </div>
     );
 }
-
-const card = {
-    padding: 14,
-    borderRadius: 12,
-    border: "1px solid #e3e3e3",
-    background: "white",
-};
-
-const btnPrimary = {
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #111",
-    background: "#111",
-    color: "white",
-    cursor: "pointer",
-};
-
-const btnSecondary = {
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #bbb",
-    background: "white",
-    cursor: "pointer",
-};
 
 export default AdminStatsPage;

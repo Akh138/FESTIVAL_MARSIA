@@ -1,220 +1,107 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from "react";
 
-const API_URL = 'http://localhost:8081/api/v1';
+const API_URL = "http://localhost:8081/api/v1";
 
 function NewsletterPage({ setPage }) {
-    const [newsletters, setNewsletters] = useState([]);
-    const [form, setForm] = useState({
-        email: '',
-        langue: 'FR',
-        confirme: false,
-    });
-    const [showForm, setShowForm] = useState(false);
-    const [editingId, setEditingId] = useState(null);
+
+    const [email, setEmail] = useState("");
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-
-    const fetchNewsletters = async () => {
-        try {
-            setLoading(true);
-            const res = await fetch(`${API_URL}/newsletter`);
-            const data = await res.json();
-            setNewsletters(data);
-        } catch {
-            setError('Impossible de charger la newsletter');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchNewsletters();
-    }, []);
-
-    const handleChange = (e) => {
-        const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-        setForm((f) => ({ ...f, [e.target.name]: value }));
-    };
+    const [message, setMessage] = useState("");
+    const [error, setError] = useState("");
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
+
+        setLoading(true);
+        setError("");
+        setMessage("");
 
         try {
-            setLoading(true);
-            if (editingId) {
-                await fetch(`${API_URL}/newsletter/${editingId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(form),
-                });
-            } else {
-                await fetch(`${API_URL}/newsletter`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(form),
-                });
+
+            const res = await fetch(`${API_URL}/newsletter/subscribe`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    email: email,
+                    langue: "FR",
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.message || "Erreur inscription");
             }
 
-            setForm({ email: '', langue: 'FR', confirme: false });
-            setEditingId(null);
-            setShowForm(false);
-            fetchNewsletters();
-        } catch {
-            setError('Erreur lors de l\'enregistrement');
+            setMessage("✅ Inscription réussie à la newsletter !");
+            setEmail("");
+
+        } catch (err) {
+            setError(err.message || "Erreur serveur");
         } finally {
             setLoading(false);
-        }
-    };
-
-    const openCreateForm = () => {
-        setEditingId(null);
-        setForm({ email: '', langue: 'FR', confirme: false });
-        setShowForm(true);
-    };
-
-    const handleEdit = (item) => {
-        setEditingId(item.id_news);
-        setForm({
-            email: item.email || '',
-            langue: item.langue || 'FR',
-            confirme: item.confirme || false,
-        });
-        setShowForm(true);
-    };
-
-    const handleDelete = async (id) => {
-        if (!window.confirm('Supprimer cette inscription newsletter ?')) return;
-        try {
-            await fetch(`${API_URL}/newsletter/${id}`, { method: 'DELETE' });
-            fetchNewsletters();
-        } catch {
-            setError('Erreur suppression');
         }
     };
 
     return (
-        <div className="admin-layout">
+        <div className="newsletter-page">
 
-            {/* CONTENU */}
-            <div className="admin-content">
-                {/* ✅ PAGE HEADER CORRIGÉ */}
-                <div className="page-header">
-                    <div>
-                        <h1>📧 Gestion Newsletter</h1>
-                        <p>{newsletters.length} inscriptions</p>
-                    </div>
-                    <div className="page-actions">
-                        <button className="btn-primary" onClick={openCreateForm}>
-                            ➕ Nouvelle inscription
-                        </button>
-                        <button className="btn-home" onClick={() => setPage('home')}>
-                            ← Accueil
-                        </button>
-                    </div>
-                </div>
+            <div className="newsletter-card">
 
-                {error && <div className="error-banner">{error}</div>}
+                <h1>📧 Newsletter MARSIA</h1>
 
-                <div className="table-section">
-                    <h3>Inscriptions Newsletter ({newsletters.length})</h3>
-                    {loading ? (
-                        <div className="loading">Chargement...</div>
-                    ) : newsletters.length === 0 ? (
-                        <div className="empty-state">
-                            <p>Aucune inscription</p>
-                            <button className="btn-primary" onClick={openCreateForm}>
-                                ➕ Ajouter la première
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="table-container">
-                            <table className="admin-table">
-                                <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Email</th>
-                                    <th>Langue</th>
-                                    <th>Confirmé</th>
-                                    <th>Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {newsletters.map((n) => (
-                                    <tr key={n.id_news}>
-                                        <td>#{n.id_news}</td>
-                                        <td>{n.email}</td>
-                                        <td>{n.langue}</td>
-                                        <td>{n.confirme ? '✅ Oui' : '⏳ Non'}</td>
-                                        <td>{new Date(n.date_inscription).toLocaleDateString('fr-FR')}</td>
-                                        <td>
-                                            <button className="btn-edit" onClick={() => handleEdit(n)} title="Modifier">✏️</button>
-                                            <button className="btn-delete" onClick={() => handleDelete(n.id_news)} title="Supprimer">🗑️</button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
+                <p>
+                    Recevez les dernières actualités du festival,
+                    les résultats et les nouveaux films.
+                </p>
 
-                {/* MODAL FORMULAIRE */}
-                {showForm && (
-                    <div className="modal-overlay" onClick={() => setShowForm(false)}>
-                        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                            <div className="modal-header">
-                                <h3>{editingId ? '✏️ Modifier' : '➕ Nouvelle inscription'}</h3>
-                                <button className="modal-close" onClick={() => setShowForm(false)}>×</button>
-                            </div>
-                            <form onSubmit={handleSubmit}>
-                                {error && <div className="error">{error}</div>}
+                <form onSubmit={handleSubmit} className="newsletter-form">
 
-                                <div className="form-row">
-                                    <label>Email *</label>
-                                    <input
-                                        name="email"
-                                        type="email"
-                                        value={form.email}
-                                        onChange={handleChange}
-                                        required
-                                    />
-                                </div>
-                                <div className="form-row">
-                                    <label>Langue *</label>
-                                    <select name="langue" value={form.langue} onChange={handleChange}>
-                                        <option value="FR">🇫🇷 Français</option>
-                                        <option value="EN">🇺🇸 English</option>
-                                    </select>
-                                </div>
-                                <div className="form-row checkbox-row">
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            name="confirme"
-                                            checked={form.confirme}
-                                            onChange={handleChange}
-                                        />
-                                        Confirmé
-                                    </label>
-                                </div>
+                    <input
+                        type="email"
+                        placeholder="Votre adresse email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="newsletter-input"
+                    />
 
-                                <div className="form-actions">
-                                    <button type="submit" disabled={loading} className="btn-primary">
-                                        {loading ? '...' : (editingId ? 'Mettre à jour' : 'Créer')}
-                                    </button>
-                                    <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>
-                                        Annuler
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                    <button
+                        type="submit"
+                        className="btn-primary btn-large"
+                        disabled={loading}
+                    >
+                        {loading ? "Inscription..." : "S'inscrire"}
+                    </button>
+
+                </form>
+
+                {message && (
+                    <div className="success-message">
+                        {message}
                     </div>
                 )}
+
+                {error && (
+                    <div className="error-message">
+                        {error}
+                    </div>
+                )}
+
+                <button
+                    className="btn-secondary"
+                    onClick={() => setPage("home")}
+                    style={{ marginTop: "20px" }}
+                >
+                    ← Retour accueil
+                </button>
+
             </div>
+
         </div>
-    ); // ✅ CLÔTURE CORRIGÉE
+    );
 }
 
 export default NewsletterPage;

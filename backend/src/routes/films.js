@@ -1,21 +1,72 @@
 // src/routes/films.js
+
 import express from "express";
 import authMiddleware from "../middlewares/auth.middleware.js";
 import requireRoles from "../middlewares/requireRoles.middleware.js";
 import optionalAuth from "../middlewares/optionalAuth.middleware.js";
+import bcrypt from "bcrypt";
+
+// upload vidéo
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+// ============================================================
+// DOSSIER D'UPLOAD
+// On stocke les vidéos dans uploads/films
+// ============================================================
+
+const uploadDir = path.resolve(process.cwd(), "uploads", "films");
+
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// nom de fichier propre et unique
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname || ".mp4");
+        const safeExt = ext && ext.length <= 10 ? ext : ".mp4";
+        cb(null, `film_${Date.now()}_${Math.round(Math.random() * 1e9)}${safeExt}`);
+    },
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 500 * 1024 * 1024 }, // 500MB max
+});
 
 export default function createFilmRoutes(db) {
     const router = express.Router();
 
-    // ✅ GET tous les films
+    // ============================================================
+    // GET tous les films
+    // - public : seulement les films approuvés avec au moins 1 vote
+    // - réalisateur : ses films + les approuvés
+    // - admin / jury : voient tout
+    // ============================================================
     router.get("/", optionalAuth, async (req, res) => {
         try {
             const { statut } = req.query;
 
             let query = `
-                SELECT f.*, u.nom as realisateur_nom, u.prenom as realisateur_prenom
+                SELECT
+                    f.*,
+                    u.nom as realisateur_nom,
+                    u.prenom as realisateur_prenom,
+                    COALESCE(vc.nb_votes, 0) AS nb_votes,
+                    vc.moyenne AS moyenne
                 FROM film f
-                         JOIN utilisateur u ON f.id_realisateur = u.id_utilisateur
+                JOIN utilisateur u ON f.id_realisateur = u.id_utilisateur
+                LEFT JOIN (
+                    SELECT
+                        id_film,
+                        COUNT(*) AS nb_votes,
+                        ROUND(AVG(note), 2) AS moyenne
+                    FROM vote
+                    GROUP BY id_film
+                ) vc ON vc.id_film = f.id_film
             `;
             const params = [];
 
@@ -23,16 +74,17 @@ export default function createFilmRoutes(db) {
             const userId = req.user?.id;
 
             if (!role) {
-                query += ` WHERE f.statut_moderation = 'approuve'`;
+                query += ` WHERE f.statut_moderation = 'approuve' AND COALESCE(vc.nb_votes, 0) > 0`;
             } else if (role === "REALISATEUR") {
                 query += ` WHERE (f.id_realisateur = ? OR f.statut_moderation = 'approuve')`;
                 params.push(userId);
             } else if (role === "ADMIN" || role === "JURY") {
-                // rien
+                // admin et jury voient tout
             } else {
-                query += ` WHERE f.statut_moderation = 'approuve'`;
+                query += ` WHERE f.statut_moderation = 'approuve' AND COALESCE(vc.nb_votes, 0) > 0`;
             }
 
+            // filtre de statut autorisé seulement pour admin / jury
             if (statut) {
                 if (role === "ADMIN" || role === "JURY") {
                     if (query.includes(" WHERE ")) {
@@ -52,19 +104,59 @@ export default function createFilmRoutes(db) {
         }
     });
 
-    // 🔒 ADMIN : films en attente de modération
-    // ⚠️ doit être AVANT "/:id"
+    // ============================================================
+    // GET films par réalisateur
+    // Un réalisateur ne peut voir que ses propres films
+    // ============================================================
+    router.get(
+        "/user/:id",
+        authMiddleware,
+        requireRoles(["ADMIN", "REALISATEUR"]),
+        async (req, res) => {
+            try {
+                const id = Number(req.params.id);
+
+                if (!Number.isInteger(id)) {
+                    return res.status(400).json({ message: "id invalide" });
+                }
+
+                if (req.user?.role === "REALISATEUR" && req.user?.id !== id) {
+                    return res.status(403).json({ message: "Accès refusé" });
+                }
+
+                const [rows] = await db.execute(
+                    `
+                        SELECT f.*
+                        FROM film f
+                        WHERE f.id_realisateur = ?
+                        ORDER BY f.id_film DESC
+                    `,
+                    [id]
+                );
+
+                res.json(rows);
+            } catch (err) {
+                console.error(err);
+                res.status(500).json({ message: "Erreur serveur" });
+            }
+        }
+    );
+
+    // ============================================================
+    // FILMS EN ATTENTE DE MODÉRATION
+    // ADMIN + MANAGER peuvent voir la liste
+    // ============================================================
     router.get(
         "/en-attente",
         authMiddleware,
-        requireRoles(["ADMIN"]),
+        requireRoles(["ADMIN", "MANAGER"]),
         async (req, res) => {
             try {
                 const [rows] = await db.execute(
                     `
                         SELECT f.*, u.nom as realisateur_nom, u.prenom as realisateur_prenom, u.email as realisateur_email
                         FROM film f
-                                 JOIN utilisateur u ON f.id_realisateur = u.id_utilisateur
+                        JOIN utilisateur u ON f.id_realisateur = u.id_utilisateur
                         WHERE f.statut_moderation = 'en attente'
                         ORDER BY f.id_film DESC
                     `
@@ -78,12 +170,14 @@ export default function createFilmRoutes(db) {
         }
     );
 
-    // 🔒 ADMIN : classement des films approuvés (moyenne + nb votes)
-    // ⚠️ doit être AVANT "/:id"
+    // ============================================================
+    // CLASSEMENT DES FILMS APPROUVÉS
+    // ADMIN + MANAGER peuvent le consulter
+    // ============================================================
     router.get(
         "/classement",
         authMiddleware,
-        requireRoles(["ADMIN"]),
+        requireRoles(["ADMIN", "MANAGER"]),
         async (req, res) => {
             try {
                 const [rows] = await db.execute(
@@ -99,8 +193,8 @@ export default function createFilmRoutes(db) {
                             COUNT(v.id_vote) AS nb_votes,
                             ROUND(AVG(v.note), 2) AS moyenne
                         FROM film f
-                                 JOIN utilisateur u ON u.id_utilisateur = f.id_realisateur
-                                 LEFT JOIN vote v ON v.id_film = f.id_film
+                        JOIN utilisateur u ON u.id_utilisateur = f.id_realisateur
+                        LEFT JOIN vote v ON v.id_film = f.id_film
                         WHERE f.statut_moderation = 'approuve'
                         GROUP BY f.id_film
                         ORDER BY moyenne DESC, nb_votes DESC, f.id_film DESC
@@ -115,8 +209,10 @@ export default function createFilmRoutes(db) {
         }
     );
 
-    // ✅ PUBLIC : position d’un film dans le classement (uniquement si approuvé)
-    // GET /api/v1/films/:id/classement-position
+    // ============================================================
+    // POSITION D'UN FILM DANS LE CLASSEMENT
+    // Public si le film est approuvé
+    // ============================================================
     router.get("/:id/classement-position", async (req, res) => {
         try {
             const id_film = Number(req.params.id);
@@ -125,8 +221,6 @@ export default function createFilmRoutes(db) {
                 return res.status(400).json({ message: "id_film invalide" });
             }
 
-            // On utilise un classement basé sur la même logique que /classement (moyenne desc, nb_votes desc, id desc)
-            // MySQL 8+ : window functions OK
             const [rows] = await db.execute(
                 `
                     WITH classement AS (
@@ -136,26 +230,25 @@ export default function createFilmRoutes(db) {
                             COUNT(v.id_vote) AS nb_votes,
                             ROUND(AVG(v.note), 2) AS moyenne,
                             RANK() OVER (
-                            ORDER BY
-                                ROUND(AVG(v.note), 2) DESC,
-                                COUNT(v.id_vote) DESC,
-                                f.id_film DESC
-                        ) AS position
-                    FROM film f
+                                ORDER BY
+                                    ROUND(AVG(v.note), 2) DESC,
+                                    COUNT(v.id_vote) DESC,
+                                    f.id_film DESC
+                            ) AS position
+                        FROM film f
                         LEFT JOIN vote v ON v.id_film = f.id_film
-                    WHERE f.statut_moderation = 'approuve'
-                    GROUP BY f.id_film
-                        )
+                        WHERE f.statut_moderation = 'approuve'
+                        GROUP BY f.id_film
+                    )
                     SELECT id_film, titre, nb_votes, moyenne, position
                     FROM classement
                     WHERE id_film = ?
-                        LIMIT 1
+                    LIMIT 1
                 `,
                 [id_film]
             );
 
             if (rows.length === 0) {
-                // soit film inexistant, soit pas approuvé => pas visible public
                 return res.status(404).json({ message: "Film non trouvé (ou non approuvé)" });
             }
 
@@ -166,8 +259,10 @@ export default function createFilmRoutes(db) {
         }
     });
 
-    // 🔒 REALISATEUR : stats d’un de ses films (nb votes, moyenne, min/max)
-    // GET /api/v1/films/:id/mes-stats
+    // ============================================================
+    // STATS D'UN FILM POUR LE RÉALISATEUR
+    // Le réalisateur voit seulement ses propres stats
+    // ============================================================
     router.get(
         "/:id/mes-stats",
         authMiddleware,
@@ -181,13 +276,12 @@ export default function createFilmRoutes(db) {
                     return res.status(400).json({ message: "id_film invalide" });
                 }
 
-                // 1) Vérifier que le film existe + appartient au realisateur connecté
                 const [films] = await db.execute(
                     `
                         SELECT id_film, id_realisateur, titre, statut_moderation
                         FROM film
                         WHERE id_film = ?
-                            LIMIT 1
+                        LIMIT 1
                     `,
                     [id_film]
                 );
@@ -202,7 +296,6 @@ export default function createFilmRoutes(db) {
                     return res.status(403).json({ message: "Accès refusé : ce film ne vous appartient pas" });
                 }
 
-                // 2) Stats votes
                 const [statsRows] = await db.execute(
                     `
                         SELECT
@@ -239,7 +332,12 @@ export default function createFilmRoutes(db) {
         }
     );
 
-    // ✅ GET film par ID
+    // ============================================================
+    // GET film par ID
+    // Public : seulement approuvé
+    // Admin / Jury : tout
+    // Réalisateur : ses films + films approuvés
+    // ============================================================
     router.get("/:id", optionalAuth, async (req, res) => {
         try {
             const { id } = req.params;
@@ -248,7 +346,7 @@ export default function createFilmRoutes(db) {
                 `
                     SELECT f.*, u.nom as realisateur_nom, u.prenom as realisateur_prenom
                     FROM film f
-                             JOIN utilisateur u ON f.id_realisateur = u.id_utilisateur
+                    JOIN utilisateur u ON f.id_realisateur = u.id_utilisateur
                     WHERE f.id_film = ?
                 `,
                 [id]
@@ -283,15 +381,131 @@ export default function createFilmRoutes(db) {
             if (film.statut_moderation !== "approuve") {
                 return res.status(403).json({ message: "Accès refusé" });
             }
-            return res.json(film);
 
+            return res.json(film);
         } catch (err) {
             console.error(err);
             res.status(500).json({ message: "Erreur serveur" });
         }
     });
 
-    // 🔒 POST nouveau film
+    // ============================================================
+    // SOUMISSION PUBLIQUE D'UN FILM
+    // Si le réalisateur n'existe pas encore, on le crée automatiquement
+    // ============================================================
+    router.post(
+        "/soumettre",
+        upload.single("fichier_video"),
+        async (req, res) => {
+            try {
+                const nom = req.body?.nom?.trim();
+                const prenom = req.body?.prenom?.trim();
+                const email = req.body?.email?.trim()?.toLowerCase();
+
+                const titre = req.body?.titre?.trim();
+                const description = req.body?.description ?? null;
+                const lien_youtube = req.body?.lien_youtube ?? null;
+                const duree_secondes = req.body?.duree_secondes ? Number(req.body.duree_secondes) : null;
+                const pays = req.body?.pays ?? null;
+
+                const fichier_video = req.file ? req.file.filename : null;
+
+                if (!nom || !prenom || !email) {
+                    return res.status(400).json({ message: "nom, prenom, email requis" });
+                }
+
+                if (!titre) {
+                    return res.status(400).json({ message: "titre requis" });
+                }
+
+                if (!fichier_video) {
+                    return res.status(400).json({ message: "fichier_video requis" });
+                }
+
+                const [existing] = await db.execute(
+                    "SELECT id_utilisateur FROM utilisateur WHERE email = ? LIMIT 1",
+                    [email]
+                );
+
+                let id_realisateur;
+
+                if (existing.length > 0) {
+                    id_realisateur = existing[0].id_utilisateur;
+                } else {
+                    const dummyPassword = await bcrypt.hash(
+                        `AUTO_${Date.now()}_${Math.random()}`,
+                        10
+                    );
+
+                    const [insUser] = await db.execute(
+                        `
+                            INSERT INTO utilisateur (nom, prenom, email, mot_de_passe, nom_role, date_inscription, actif)
+                            VALUES (?, ?, ?, ?, 'REALISATEUR', NOW(), 1)
+                        `,
+                        [nom, prenom, email, dummyPassword]
+                    );
+
+                    id_realisateur = insUser.insertId;
+                }
+
+                try {
+                    const [result] = await db.execute(
+                        `
+                            INSERT INTO film (id_realisateur, titre, description, lien_youtube, duree_secondes, pays, statut_moderation, fichier_video)
+                            VALUES (?, ?, ?, ?, ?, ?, 'en attente', ?)
+                        `,
+                        [
+                            id_realisateur,
+                            titre,
+                            description || null,
+                            lien_youtube || null,
+                            duree_secondes || null,
+                            pays || null,
+                            fichier_video,
+                        ]
+                    );
+
+                    return res.status(201).json({
+                        success: true,
+                        id_film: result.insertId,
+                        message: "Film soumis en attente de modération !",
+                        fichier_video: `/uploads/films/${fichier_video}`,
+                    });
+                } catch (errInsert) {
+                    const [result2] = await db.execute(
+                        `
+                            INSERT INTO film (id_realisateur, titre, description, lien_youtube, duree_secondes, pays, statut_moderation)
+                            VALUES (?, ?, ?, ?, ?, ?, 'en attente')
+                        `,
+                        [
+                            id_realisateur,
+                            titre,
+                            description || null,
+                            lien_youtube || null,
+                            duree_secondes || null,
+                            pays || null,
+                        ]
+                    );
+
+                    return res.status(201).json({
+                        success: true,
+                        id_film: result2.insertId,
+                        message: "Film soumis en attente de modération !",
+                        warning: "Colonne fichier_video absente en BDD (fichier stocké mais non référencé en base).",
+                        fichier_video: `/uploads/films/${fichier_video}`,
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+                res.status(500).json({ message: "Erreur serveur" });
+            }
+        }
+    );
+
+    // ============================================================
+    // ANCIENNE ROUTE DE CRÉATION DE FILM
+    // Réservée au réalisateur connecté
+    // ============================================================
     router.post(
         "/",
         authMiddleware,
@@ -310,8 +524,10 @@ export default function createFilmRoutes(db) {
                 }
 
                 const [result] = await db.execute(
-                    `INSERT INTO film (id_realisateur, titre, description, lien_youtube, duree_secondes, pays, statut_moderation)
-                     VALUES (?, ?, ?, ?, ?, ?, 'en attente')`,
+                    `
+                        INSERT INTO film (id_realisateur, titre, description, lien_youtube, duree_secondes, pays, statut_moderation)
+                        VALUES (?, ?, ?, ?, ?, ?, 'en attente')
+                    `,
                     [
                         id_realisateur,
                         titre,
@@ -334,11 +550,14 @@ export default function createFilmRoutes(db) {
         }
     );
 
-    // 🔒 PATCH modération
+    // ============================================================
+    // MODÉRATION D'UN FILM
+    // ADMIN + MANAGER peuvent approuver ou rejeter
+    // ============================================================
     router.patch(
         "/:id/moderation",
         authMiddleware,
-        requireRoles(["ADMIN"]),
+        requireRoles(["ADMIN", "MANAGER"]),
         async (req, res) => {
             try {
                 const { id } = req.params;
@@ -366,7 +585,147 @@ export default function createFilmRoutes(db) {
         }
     );
 
-    // 🔒 JURY : voter
+    // ============================================================
+    // SUPPRESSION D'UN FILM
+    // Ici on laisse ADMIN seul pour rester prudent
+    // ============================================================
+    router.delete(
+        "/:id",
+        authMiddleware,
+        requireRoles(["ADMIN"]),
+        async (req, res) => {
+            try {
+                const id_film = Number(req.params.id);
+
+                if (!Number.isInteger(id_film)) {
+                    return res.status(400).json({ message: "id_film invalide" });
+                }
+
+                const [rows] = await db.execute(
+                    "SELECT fichier_video FROM film WHERE id_film = ? LIMIT 1",
+                    [id_film]
+                );
+
+                if (rows.length === 0) {
+                    return res.status(404).json({ message: "Film non trouvé" });
+                }
+
+                const fichier_video = rows[0].fichier_video;
+
+                await db.execute("DELETE FROM vote WHERE id_film = ?", [id_film]);
+
+                const [del] = await db.execute(
+                    "DELETE FROM film WHERE id_film = ?",
+                    [id_film]
+                );
+
+                if (del.affectedRows === 0) {
+                    return res.status(404).json({ message: "Film non trouvé" });
+                }
+
+                if (fichier_video) {
+                    const filePath = path.resolve(process.cwd(), "uploads", "films", fichier_video);
+                    try {
+                        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                    } catch (e) {
+                        console.warn("Suppression fichier vidéo échouée:", e.message);
+                    }
+                }
+
+                return res.json({ success: true, message: "Film supprimé ✅" });
+            } catch (err) {
+                console.error(err);
+                res.status(500).json({ message: "Erreur serveur" });
+            }
+        }
+    );
+
+    // ============================================================
+    // DASHBOARD JURY
+    // Films à voter + films déjà votés
+    // ============================================================
+    router.get(
+        "/jury/dashboard",
+        authMiddleware,
+        requireRoles(["JURY"]),
+        async (req, res) => {
+            try {
+                const id_jury = req.user.id;
+
+                const [aVoter] = await db.execute(
+                    `
+                        SELECT
+                            f.*,
+                            u.nom AS realisateur_nom,
+                            u.prenom AS realisateur_prenom,
+                            COALESCE(vc.nb_votes, 0) AS nb_votes,
+                            vc.moyenne AS moyenne
+                        FROM film f
+                        JOIN utilisateur u ON u.id_utilisateur = f.id_realisateur
+                        LEFT JOIN vote vj ON vj.id_film = f.id_film AND vj.id_jury = ?
+                        LEFT JOIN (
+                            SELECT
+                                id_film,
+                                COUNT(*) AS nb_votes,
+                                ROUND(AVG(note), 2) AS moyenne
+                            FROM vote
+                            GROUP BY id_film
+                        ) vc ON vc.id_film = f.id_film
+                        WHERE f.statut_moderation = 'approuve'
+                          AND vj.id_vote IS NULL
+                        ORDER BY f.id_film DESC
+                    `,
+                    [id_jury]
+                );
+
+                const [dejaVotes] = await db.execute(
+                    `
+                        SELECT
+                            f.*,
+                            u.nom AS realisateur_nom,
+                            u.prenom AS realisateur_prenom,
+                            COALESCE(vc.nb_votes, 0) AS nb_votes,
+                            vc.moyenne AS moyenne,
+                            v.id_vote,
+                            v.note,
+                            v.commentaire
+                        FROM vote v
+                        JOIN film f ON f.id_film = v.id_film
+                        JOIN utilisateur u ON u.id_utilisateur = f.id_realisateur
+                        LEFT JOIN (
+                            SELECT
+                                id_film,
+                                COUNT(*) AS nb_votes,
+                                ROUND(AVG(note), 2) AS moyenne
+                            FROM vote
+                            GROUP BY id_film
+                        ) vc ON vc.id_film = f.id_film
+                        WHERE v.id_jury = ?
+                          AND f.statut_moderation = 'approuve'
+                        ORDER BY v.id_vote DESC
+                    `,
+                    [id_jury]
+                );
+
+                return res.json({
+                    a_voter: aVoter,
+                    deja_votes: dejaVotes,
+                    stats: {
+                        nb_a_voter: aVoter.length,
+                        nb_deja_votes: dejaVotes.length,
+                    }
+                });
+            } catch (err) {
+                console.error(err);
+                res.status(500).json({ message: "Erreur serveur" });
+            }
+        }
+    );
+
+    // ============================================================
+    // JURY : voter pour un film
+    // 1 seul vote par film
+    // ============================================================
     router.post(
         "/:id/vote",
         authMiddleware,
@@ -432,7 +791,6 @@ export default function createFilmRoutes(db) {
                     message: "Vote enregistré ✅",
                     vote: { id_film, id_jury, note }
                 });
-
             } catch (err) {
                 if (err.code === "ER_DUP_ENTRY") {
                     return res.status(409).json({ message: "Vous avez déjà voté pour ce film" });
@@ -443,7 +801,11 @@ export default function createFilmRoutes(db) {
         }
     );
 
-    // 🔒 Voir les votes d'un film
+    // ============================================================
+    // Voir les votes d'un film
+    // ADMIN : tous les votes
+    // JURY : seulement ses propres votes
+    // ============================================================
     router.get(
         "/:id/votes",
         authMiddleware,
@@ -472,7 +834,7 @@ export default function createFilmRoutes(db) {
                     SELECT v.id_vote, v.id_film, v.id_jury, v.note, v.commentaire,
                            u.nom, u.prenom, u.email
                     FROM vote v
-                             JOIN utilisateur u ON u.id_utilisateur = v.id_jury
+                    JOIN utilisateur u ON u.id_utilisateur = v.id_jury
                     WHERE v.id_film = ?
                 `;
                 const params = [id_film];
@@ -486,7 +848,6 @@ export default function createFilmRoutes(db) {
 
                 const [votes] = await db.execute(query, params);
                 return res.json(votes);
-
             } catch (err) {
                 console.error(err);
                 res.status(500).json({ message: "Erreur serveur" });

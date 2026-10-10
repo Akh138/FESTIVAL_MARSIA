@@ -1,137 +1,205 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef, useState } from "react";
+import AnimatedJuryTitle from "../components/AnimatedJuryTitle.jsx";
 
-const API_URL = 'http://localhost:8081/api/v1';
+const API_URL = "http://localhost:8081/api/v1";
 
-function SoumissionFilmPage({ setPage, user }) {
+function SoumissionFilmPage({ setPage }) {
+    // =========================================================
+    // État du formulaire
+    // =========================================================
     const [form, setForm] = useState({
-        titre: '',
-        description: '',
-        lien_youtube: '',
+        nom: "",
+        prenom: "",
+        email: "",
+        titre: "",
+        description: "",
+        lien_youtube: "",
         fichier_video: null,
-        duree_secondes: '',
-        pays: ''
+        duree_secondes: "",
+        pays: "",
     });
-    const [films, setFilms] = useState([]);
+
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [uploadProgress, setUploadProgress] = useState(0);
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
     const fileInputRef = useRef(null);
 
-    // Charge les films du user connecté
-    useEffect(() => {
-        if (user?.id_utilisateur) {
-            fetchFilms();
-        }
-    }, [user]);
-
-    const fetchFilms = async () => {
-        try {
-            const res = await fetch(`${API_URL}/films/user/${user.id_utilisateur}`);
-            const data = await res.json();
-            setFilms(data);
-        } catch {
-            setError('Erreur chargement films');
-        }
-    };
-
+    // =========================================================
+    // Mise à jour des champs
+    // =========================================================
     const handleChange = (e) => {
-        if (e.target.name === 'fichier_video') {
-            const file = e.target.files[0];
-            if (file && file.size > 500 * 1024 * 1024) { // 500MB max
-                setError('Fichier trop volumineux (max 500MB)');
+        setError("");
+        setSuccess("");
+
+        if (e.target.name === "fichier_video") {
+            const file = e.target.files?.[0];
+
+            if (file && file.size > 500 * 1024 * 1024) {
+                setError("Fichier trop volumineux (max 500MB)");
                 return;
             }
-            setForm((f) => ({ ...f, fichier_video: file }));
-            setError('');
-        } else {
-            setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+
+            setForm((prev) => ({
+                ...prev,
+                fichier_video: file || null,
+            }));
+            return;
         }
+
+        setForm((prev) => ({
+            ...prev,
+            [e.target.name]: e.target.value,
+        }));
     };
 
+    // =========================================================
+    // Envoi du formulaire
+    // =========================================================
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
+        setError("");
+        setSuccess("");
+
+        // validations simples côté front
+        if (!form.nom || !form.prenom || !form.email || !form.titre || !form.fichier_video) {
+            setError("Merci de remplir nom, prénom, email, titre et de joindre une vidéo.");
+            return;
+        }
 
         const formData = new FormData();
-        formData.append('id_realisateur', user.id_utilisateur);
-        formData.append('titre', form.titre);
-        formData.append('description', form.description);
-        formData.append('lien_youtube', form.lien_youtube);
-        formData.append('duree_secondes', Number(form.duree_secondes) || null);
-        formData.append('pays', form.pays);
+        formData.append("nom", form.nom);
+        formData.append("prenom", form.prenom);
+        formData.append("email", form.email);
+        formData.append("titre", form.titre);
+        formData.append("description", form.description);
+        formData.append("lien_youtube", form.lien_youtube);
+        formData.append("duree_secondes", Number(form.duree_secondes) || "");
+        formData.append("pays", form.pays);
+
         if (form.fichier_video) {
-            formData.append('fichier_video', form.fichier_video);
+            formData.append("fichier_video", form.fichier_video);
         }
 
         try {
             setLoading(true);
-            const res = await fetch(`${API_URL}/films`, {
-                method: 'POST',
-                body: formData
+
+            const res = await fetch(`${API_URL}/films/soumettre`, {
+                method: "POST",
+                body: formData,
             });
 
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || 'Erreur soumission');
+            const text = await res.text();
+            let data = null;
+
+            try {
+                data = text ? JSON.parse(text) : null;
+            } catch {
+                data = text;
             }
 
-            // Reset form
+            if (!res.ok) {
+                throw new Error(data?.message || data?.error || "Erreur soumission");
+            }
+
+            // reset du formulaire
             setForm({
-                titre: '',
-                description: '',
-                lien_youtube: '',
+                nom: "",
+                prenom: "",
+                email: "",
+                titre: "",
+                description: "",
+                lien_youtube: "",
                 fichier_video: null,
-                duree_secondes: '',
-                pays: ''
+                duree_secondes: "",
+                pays: "",
             });
-            if (fileInputRef.current) fileInputRef.current.value = '';
-            fetchFilms();
-            setError('');
+
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
+
+            setSuccess("✅ Film soumis ! Il passera en modération (admin) avant publication.");
         } catch (err) {
             setError(err.message || "Erreur lors de la soumission");
         } finally {
             setLoading(false);
-            setUploadProgress(0);
         }
     };
 
-    const formatDuration = (seconds) => {
-        if (!seconds) return 'N/A';
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
     return (
-        <div className="page-container">
-            {/* HEADER avec boutons navigation */}
-            <div className="page-header">
-                <div>
-                    <h1>🎬 Soumission Film</h1>
-                    <p>Bonjour {user?.prenom || 'Réalisateur'} ! Soumettez votre court-métrage IA</p>
+        <div className="admin-content submit-film-page">
+            {/* =========================================================
+                Header de page
+                - titre animé centré
+                - bouton retour à droite
+               ========================================================= */}
+            <div className="page-header submit-film-header">
+                <div className="submit-film-titleArea">
+                    <AnimatedJuryTitle text="Soumission Film" />
                 </div>
-                <div className="page-actions">
-                    {/* 🔗 LIEN VERS BIOGRAPHIE */}
-                    <button
-                        className="btn-primary"
-                        onClick={() => setPage('biographie')}
-                    >
-                        ✍️ Gérer ma biographie
-                    </button>
-                    <button
-                        className="btn-secondary"
-                        onClick={() => setPage('home')}
-                    >
+
+                <div className="page-actions submit-film-actions">
+                    <button className="btn-secondary" onClick={() => setPage("home")}>
                         ← Accueil
                     </button>
                 </div>
             </div>
 
-            {/* 📤 FORMULAIRE SOUMISSION */}
-            <form className="card form-large" onSubmit={handleSubmit}>
-                <h3>➕ Nouveau film</h3>
+            {/* =========================================================
+                Intro
+               ========================================================= */}
+            <div className="submit-film-intro">
+                <p>Soumettez votre court-métrage IA sans créer de compte.</p>
+            </div>
+
+            {/* =========================================================
+                Formulaire principal
+               ========================================================= */}
+            <form className="table-section submit-film-form" onSubmit={handleSubmit}>
+                <div className="submit-film-formTop">
+                    <h3>➕ Nouveau film</h3>
+                    <p className="submit-film-formHint">Tous les champs marqués * sont obligatoires.</p>
+                </div>
 
                 {error && <div className="error-banner">{error}</div>}
+                {success && <div className="success-banner">{success}</div>}
+
+                {/* Coordonnées réalisateur */}
+                <div className="form-row two-cols submit-film-twoCols">
+                    <div>
+                        <label>Nom *</label>
+                        <input
+                            name="nom"
+                            value={form.nom}
+                            onChange={handleChange}
+                            required
+                            placeholder="Nom"
+                        />
+                    </div>
+
+                    <div>
+                        <label>Prénom *</label>
+                        <input
+                            name="prenom"
+                            value={form.prenom}
+                            onChange={handleChange}
+                            required
+                            placeholder="Prénom"
+                        />
+                    </div>
+                </div>
+
+                <div className="form-row">
+                    <label>Email *</label>
+                    <input
+                        type="email"
+                        name="email"
+                        value={form.email}
+                        onChange={handleChange}
+                        required
+                        placeholder="email@exemple.com"
+                    />
+                </div>
 
                 <div className="form-row">
                     <label>Titre *</label>
@@ -140,7 +208,7 @@ function SoumissionFilmPage({ setPage, user }) {
                         value={form.titre}
                         onChange={handleChange}
                         required
-                        placeholder="Ex: 'IA Dreamscapes'"
+                        placeholder="Ex : IA Dreamscapes"
                     />
                 </div>
 
@@ -155,8 +223,9 @@ function SoumissionFilmPage({ setPage, user }) {
                     />
                 </div>
 
-                <div className="form-row">
+                <div className="form-row submit-film-uploadRow">
                     <label>Fichier vidéo (MP4, max 500MB) *</label>
+
                     <input
                         ref={fileInputRef}
                         name="fichier_video"
@@ -165,10 +234,10 @@ function SoumissionFilmPage({ setPage, user }) {
                         onChange={handleChange}
                         required
                     />
+
                     {form.fichier_video && (
-                        <p className="file-info">
-                            📁 {form.fichier_video.name}
-                            ({(form.fichier_video.size / 1024 / 1024).toFixed(1)} MB)
+                        <p className="file-info submit-film-fileInfo">
+                            📁 {form.fichier_video.name} ({(form.fichier_video.size / 1024 / 1024).toFixed(1)} MB)
                         </p>
                     )}
                 </div>
@@ -183,7 +252,7 @@ function SoumissionFilmPage({ setPage, user }) {
                     />
                 </div>
 
-                <div className="form-row two-cols">
+                <div className="form-row two-cols submit-film-twoCols">
                     <div>
                         <label>Durée (secondes)</label>
                         <input
@@ -193,8 +262,10 @@ function SoumissionFilmPage({ setPage, user }) {
                             max="1800"
                             value={form.duree_secondes}
                             onChange={handleChange}
+                            placeholder="Ex : 180"
                         />
                     </div>
+
                     <div>
                         <label>Pays</label>
                         <input
@@ -206,51 +277,12 @@ function SoumissionFilmPage({ setPage, user }) {
                     </div>
                 </div>
 
-                <button type="submit" disabled={loading} className="btn-primary btn-large">
-                    {loading ? '📤 Soumission en cours...' : '📤 Soumettre mon film'}
-                </button>
+                <div className="submit-film-submitWrap">
+                    <button type="submit" disabled={loading} className="btn-primary btn-large submit-film-submitBtn">
+                        {loading ? "📤 Soumission en cours..." : "📤 Soumettre mon film"}
+                    </button>
+                </div>
             </form>
-
-            {/* 📋 MES FILMS SOUMIS */}
-            <div className="table-section">
-                <h3>Mes films soumis ({films.length})</h3>
-                {films.length === 0 ? (
-                    <div className="empty-state">
-                        <p>Aucun film soumis</p>
-                        <p>Soumettez votre premier court-métrage ci-dessus !</p>
-                    </div>
-                ) : (
-                    <div className="table-container">
-                        <table className="admin-table">
-                            <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Titre</th>
-                                <th>Durée</th>
-                                <th>Pays</th>
-                                <th>Statut</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {films.map((f) => (
-                                <tr key={f.id_film}>
-                                    <td>#{f.id_film}</td>
-                                    <td>{f.titre}</td>
-                                    <td>{formatDuration(f.duree_secondes)}</td>
-                                    <td>{f.pays}</td>
-                                    <td>
-                                            <span className={`status-badge status-${f.statut_moderation?.toLowerCase()}`}>
-                                                {f.statut_moderation === 'EN_ATTENTE' ? '⏳ En attente' :
-                                                    f.statut_moderation === 'VALIDE' ? '✅ Validé' : '❌ Rejeté'}
-                                            </span>
-                                    </td>
-                                </tr>
-                            ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
         </div>
     );
 }

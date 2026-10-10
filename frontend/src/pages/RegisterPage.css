@@ -1,0 +1,216 @@
+/* =========================================================
+   RegisterPage.css
+   Page inscription
+   - carte centrée
+   - même univers visuel que connexion
+   - select stylé proprement
+   ========================================================= */
+
+
+/* zone globale */
+.auth-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 70vh;
+    padding: 40px 20px;
+}
+
+
+/* carte principale */
+.auth-card {
+    width: 100%;
+    max-width: 560px;
+    padding: 40px;
+    border-radius: 22px;
+
+    background: rgba(8,12,24,0.65);
+    backdrop-filter: blur(12px);
+
+    border: 1px solid rgba(120,210,255,0.20);
+
+    box-shadow:
+            0 0 0 1px rgba(120,210,255,0.06),
+            0 0 18px rgba(70,160,255,0.12),
+            0 0 28px rgba(40,120,255,0.08),
+            0 20px 60px rgba(0,0,0,.45);
+}
+
+
+/* haut de carte */
+.auth-header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.auth-header p {
+    margin-top: 6px;
+    color: rgba(255,255,255,0.70);
+}
+
+
+/* espaces entre les champs */
+.auth-card .form-row {
+    margin-bottom: 18px;
+}
+
+
+/* inputs texte */
+.auth-card .form-row input,
+.auth-card .form-row select {
+    width: 100%;
+    padding: 16px 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(120,210,255,0.20);
+    background: rgba(10,20,40,0.55);
+    color: white;
+    font-size: 15px;
+    transition: all .2s ease;
+    outline: none;
+}
+
+.auth-card .form-row input::placeholder {
+    color: rgba(255,255,255,0.45);
+}
+
+.auth-card .form-row input:focus,
+.auth-card .form-row select:focus {
+    border-color: rgba(120,210,255,0.45);
+    box-shadow:
+            0 0 0 1px rgba(120,210,255,0.12),
+            0 0 12px rgba(70,160,255,0.15);
+}
+
+/* pour que les options restent lisibles */
+.auth-card .form-row select option {
+    background: #091224;
+    color: white;
+}
+
+
+/* bouton principal */
+.btn-large {
+    width: 100%;
+    margin-top: 10px;
+}
+
+.auth-card .btn-primary {
+    position: relative;
+    overflow: hidden;
+
+    border: 1px solid rgba(120, 210, 255, 0.22) !important;
+    background: rgba(20, 35, 60, 0.35) !important;
+    color: rgba(255,255,255,.96) !important;
+
+    box-shadow:
+            0 0 0 1px rgba(120, 210, 255, 0.05),
+            0 0 10px rgba(70, 160, 255, 0.08),
+            0 0 18px rgba(40, 120, 255, 0.05);
+
+    backdrop-filter: blur(6px);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.auth-card .btn-primary:hover {
+    border-color: rgba(140, 220, 255, 0.32) !important;
+    box-shadow:
+            0 0 0 1px rgba(140, 220, 255, 0.08),
+            0 0 14px rgba(90, 180, 255, 0.12),
+            0 0 22px rgba(50, 130, 255, 0.08);
+    transform: translateY(-1px);
+}
+
+.auth-card .btn-primary::after {
+    content: "";
+    position: absolute;
+    top: -30%;
+    left: -140%;
+    width: 70%;
+    height: 160%;
+    transform: rotate(18deg);
+    pointer-events: none;
+
+    background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(170, 225, 255, 0.02) 35%,
+            rgba(120, 205, 255, 0.10) 50%,
+            rgba(170, 225, 255, 0.02) 65%,
+            transparent 100%
+    );
+
+    animation: registerButtonSweep 7s ease-in-out infinite;
+}
+
+
+/* bas de carte */
+.auth-footer {
+    margin-top: 18px;
+    text-align: center;
+    color: rgba(255,255,255,0.75);
+}
+
+.link-btn {
+    background: none;
+    border: none;
+    color: rgba(120,210,255,0.9);
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.link-btn:hover {
+    text-decoration: underline;
+}
+
+
+/* message erreur */
+.error {
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(255,80,80,0.15);
+    border: 1px solid rgba(255,80,80,0.35);
+    color: #ffb3b3;
+    font-size: 14px;
+}
+
+
+/* reflet du bouton */
+@keyframes registerButtonSweep {
+    0% {
+        left: -140%;
+        opacity: 0;
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    45% {
+        left: 140%;
+        opacity: 1;
+    }
+
+    55% {
+        left: 140%;
+        opacity: 0;
+    }
+
+    100% {
+        left: 140%;
+        opacity: 0;
+    }
+}
+
+
+/* responsive */
+@media (max-width: 640px) {
+    .auth-page {
+        padding: 28px 16px;
+    }
+
+    .auth-card {
+        padding: 28px 20px;
+        border-radius: 18px;
+    }
+}
